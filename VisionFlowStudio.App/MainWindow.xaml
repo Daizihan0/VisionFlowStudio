@@ -1,0 +1,424 @@
+﻿<Window x:Class="VisionFlowStudio.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:viewModels="clr-namespace:VisionFlowStudio.App.ViewModels"
+        mc:Ignorable="d"
+        Title="VisionFlow Studio"
+        Width="1560"
+        Height="920"
+        MinWidth="1320"
+        MinHeight="820"
+        Background="#0B1220"
+        Foreground="#E2E8F0"
+        WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <Style x:Key="GlassPanelStyle" TargetType="Border">
+            <Setter Property="Background" Value="#111A2C" />
+            <Setter Property="BorderBrush" Value="#24324B" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="18" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+        </Style>
+
+        <Style x:Key="ToolbarButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="#E2E8F0" />
+            <Setter Property="Background" Value="#18243A" />
+            <Setter Property="BorderBrush" Value="#2C3E5F" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#20304D" />
+                    <Setter Property="BorderBrush" Value="#45608D" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.55" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="NodeButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="220" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Style="{StaticResource GlassPanelStyle}" Padding="18">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Vertical">
+                    <TextBlock FontSize="28" FontWeight="SemiBold" Text="VisionFlow Studio" />
+                    <TextBlock Margin="0,6,0,0"
+                               Foreground="#94A3B8"
+                               FontSize="13"
+                               Text="{Binding HeaderSubtitle}" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding NewProjectCommand}" Content="新建项目" />
+                    <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding SaveProjectCommand}" Content="保存工程" />
+                    <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding LoadProjectCommand}" Content="打开工程" />
+                    <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding CaptureImageForNodeCommand}" Content="截图定位" />
+                    <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding PasteImageForNodeCommand}" Content="粘贴图片" />
+                    <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding PickPointForNodeCommand}" Content="手动定位" />
+                    <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding StartRecordingCommand}" Content="开始录制" />
+                    <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding StopRecordingCommand}" Content="停止录制" />
+                    <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding RunPreviewCommand}" Content="运行预览" />
+                    <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding RunLiveCommand}" Content="真实执行" />
+                    <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding StopExecutionCommand}" Content="停止" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" Margin="0,16,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="290" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="340" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource GlassPanelStyle}" Margin="0,0,16,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <Border Background="#172338" CornerRadius="14" Padding="14">
+                            <StackPanel>
+                                <TextBlock Text="{Binding ProjectName}" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Margin="0,6,0,0" Foreground="#94A3B8" Text="{Binding NodeSummaryText}" />
+                                <TextBlock Margin="0,10,0,0"
+                                           Foreground="#CBD5E1"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding ProjectDescription}" />
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Margin="0,18,0,10" FontSize="15" FontWeight="SemiBold" Text="节点库" />
+                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddVisionNodeCommand}" Content="🖼 截图锚点节点" />
+                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddActionNodeCommand}" Content="🖱 动作节点" />
+                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddWaitNodeCommand}" Content="⏱ 等待节点" />
+                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddConditionNodeCommand}" Content="🔀 条件分支节点" />
+                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddSubFlowNodeCommand}" Content="🎞 录制片段节点" />
+                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddEndNodeCommand}" Content="🏁 结束节点" />
+
+                        <TextBlock Margin="0,18,0,10" FontSize="15" FontWeight="SemiBold" Text="资源概览" />
+                        <ItemsControl ItemsSource="{Binding AssetItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,8" Padding="10" Background="#131E31" CornerRadius="12">
+                                        <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Margin="0,18,0,10" FontSize="15" FontWeight="SemiBold" Text="定时执行" />
+                        <ItemsControl ItemsSource="{Binding ScheduleItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,8" Padding="10" Background="#131E31" CornerRadius="12">
+                                        <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource GlassPanelStyle}" Margin="0,0,16,0" Padding="0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0"
+                            Background="#10192A"
+                            BorderBrush="#23304B"
+                            BorderThickness="0,0,0,1"
+                            CornerRadius="18,18,0,0"
+                            Padding="16,12">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock FontSize="18" FontWeight="SemiBold" Text="流程画布" />
+                                <Border Margin="12,0,0,0" Padding="10,4" Background="#1E293B" CornerRadius="999">
+                                    <TextBlock Foreground="#93C5FD" Text="{Binding RunStateText}" />
+                                </Border>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Border Margin="0,0,8,0" Padding="10,4" Background="#172033" CornerRadius="999">
+                                    <TextBlock Foreground="#F8FAFC" Text="F9 停止录制" />
+                                </Border>
+                                <Border Padding="10,4" Background="#172033" CornerRadius="999">
+                                    <TextBlock Foreground="#F8FAFC" Text="F10 紧急停止" />
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <ScrollViewer Grid.Row="1"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Auto"
+                                  Background="#0C1423">
+                        <Canvas x:Name="DesignerSurface"
+                                Width="1800"
+                                Height="1100"
+                                Background="#0C1423"
+                                ClipToBounds="False">
+                            <ItemsControl ItemsSource="{Binding Connections}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <Canvas />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type viewModels:DesignerConnectionViewModel}">
+                                        <Canvas>
+                                            <Path Data="{Binding PathData}"
+                                                  Stroke="{Binding StrokeBrush}"
+                                                  StrokeThickness="3"
+                                                  Opacity="0.95" />
+                                            <Border Canvas.Left="{Binding LabelX}"
+                                                    Canvas.Top="{Binding LabelY}"
+                                                    Padding="8,3"
+                                                    Background="#0F172A"
+                                                    BorderBrush="#334155"
+                                                    BorderThickness="1"
+                                                    CornerRadius="999">
+                                                <TextBlock FontSize="11"
+                                                           Foreground="{Binding StrokeBrush}"
+                                                           Text="{Binding Label}" />
+                                            </Border>
+                                        </Canvas>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <ItemsControl ItemsSource="{Binding Nodes}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <Canvas />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemContainerStyle>
+                                    <Style TargetType="ContentPresenter">
+                                        <Setter Property="Canvas.Left" Value="{Binding X}" />
+                                        <Setter Property="Canvas.Top" Value="{Binding Y}" />
+                                    </Style>
+                                </ItemsControl.ItemContainerStyle>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type viewModels:FlowNodeViewModel}">
+                                        <Border Width="{Binding Width}"
+                                                Height="{Binding Height}"
+                                                Background="{Binding SurfaceBrush}"
+                                                BorderBrush="{Binding BorderBrush}"
+                                                BorderThickness="{Binding BorderThicknessValue}"
+                                                CornerRadius="18"
+                                                Cursor="SizeAll"
+                                                MouseLeftButtonDown="Node_MouseLeftButtonDown"
+                                                MouseLeftButtonUp="Node_MouseLeftButtonUp"
+                                                MouseMove="Node_MouseMove">
+                                            <Grid>
+                                                <Rectangle Height="6"
+                                                           RadiusX="3"
+                                                           RadiusY="3"
+                                                           VerticalAlignment="Top"
+                                                           Fill="{Binding AccentBrush}" />
+                                                <Grid Margin="14,14,14,12">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="*" />
+                                                        <RowDefinition Height="Auto" />
+                                                    </Grid.RowDefinitions>
+
+                                                    <DockPanel Grid.Row="0">
+                                                        <TextBlock FontSize="15"
+                                                                   FontWeight="SemiBold"
+                                                                   Text="{Binding Title}" />
+                                                        <Border DockPanel.Dock="Right"
+                                                                Padding="8,3"
+                                                                Background="#0F172A"
+                                                                CornerRadius="999">
+                                                            <TextBlock Foreground="{Binding AccentBrush}"
+                                                                       FontSize="11"
+                                                                       Text="{Binding StatusLabel}" />
+                                                        </Border>
+                                                    </DockPanel>
+
+                                                    <TextBlock Grid.Row="1"
+                                                               Margin="0,10,0,10"
+                                                               Foreground="#A5B4FC"
+                                                               TextWrapping="Wrap"
+                                                               Text="{Binding Description}" />
+
+                                                    <Grid Grid.Row="2">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <Ellipse Width="12" Height="12" Fill="#0F172A" Stroke="{Binding AccentBrush}" StrokeThickness="2" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Margin="10,0"
+                                                                   VerticalAlignment="Center"
+                                                                   Foreground="#94A3B8"
+                                                                   FontSize="11"
+                                                                   Text="{Binding DisplayKind}" />
+                                                        <Ellipse Grid.Column="2"
+                                                                 Width="12"
+                                                                 Height="12"
+                                                                 Fill="{Binding AccentBrush}"
+                                                                 Stroke="#E2E8F0"
+                                                                 StrokeThickness="1.2"
+                                                                 VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Grid>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Canvas>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource GlassPanelStyle}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock FontSize="18" FontWeight="SemiBold" Text="属性面板" />
+                        <TextBlock Margin="0,8,0,0" Foreground="#94A3B8" Text="选中节点后可直接编辑属性。" />
+
+                        <Border Margin="0,16,0,0" Background="#131E31" CornerRadius="14" Padding="14">
+                            <StackPanel>
+                                <TextBlock FontSize="14" FontWeight="SemiBold" Text="{Binding SelectedNode.Title, TargetNullValue=未选择节点}" />
+                                <TextBlock Margin="0,6,0,0" Foreground="#93C5FD" Text="{Binding SelectedNode.DisplayKind, TargetNullValue=请先点击画布中的节点}" />
+                                <TextBlock Margin="0,6,0,0" Foreground="#CBD5E1" Text="{Binding SelectedNode.AssetSummary, TargetNullValue=无截图资源}" />
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Margin="0,18,0,8" Foreground="#CBD5E1" Text="节点名称" />
+                        <TextBox Padding="12,8" Background="#0F172A" BorderBrush="#334155" BorderThickness="1" Foreground="#E2E8F0" Text="{Binding SelectedNode.Title, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Margin="0,16,0,8" Foreground="#CBD5E1" Text="节点描述" />
+                        <TextBox Padding="12,8"
+                                 Background="#0F172A"
+                                 BorderBrush="#334155"
+                                 BorderThickness="1"
+                                 Foreground="#E2E8F0"
+                                 Text="{Binding SelectedNode.Description, UpdateSourceTrigger=PropertyChanged}"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 MinHeight="88" />
+
+                        <UniformGrid Margin="0,16,0,0" Columns="2">
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Margin="0,0,0,8" Foreground="#CBD5E1" Text="超时（ms）" />
+                                <TextBox Padding="12,8" Background="#0F172A" BorderBrush="#334155" BorderThickness="1" Foreground="#E2E8F0" Text="{Binding SelectedNode.TimeoutMs, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,0">
+                                <TextBlock Margin="0,0,0,8" Foreground="#CBD5E1" Text="重试次数" />
+                                <TextBox Padding="12,8" Background="#0F172A" BorderBrush="#334155" BorderThickness="1" Foreground="#E2E8F0" Text="{Binding SelectedNode.RetryLimit, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </UniformGrid>
+
+                        <TextBlock Margin="0,16,0,8" Foreground="#CBD5E1" Text="节点参数（每行 key=value）" />
+                        <TextBox Padding="12,10"
+                                 Background="#0F172A"
+                                 BorderBrush="#334155"
+                                 BorderThickness="1"
+                                 Foreground="#E2E8F0"
+                                 Text="{Binding SelectedNode.SettingsEditorText, UpdateSourceTrigger=PropertyChanged}"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 MinHeight="160"
+                                 VerticalScrollBarVisibility="Auto" />
+
+                        <TextBlock Margin="0,16,0,8" Foreground="#CBD5E1" Text="设计提示" />
+                        <Border Background="#131E31" CornerRadius="14" Padding="14">
+                            <StackPanel>
+                                <TextBlock TextWrapping="Wrap" Foreground="#E2E8F0" Text="• 先用录制片段快速生成步骤，再把关键点击替换成截图锚点。" />
+                                <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Foreground="#E2E8F0" Text="• 条件节点可通过 ExpectedState=true/false 决定预览走向。" />
+                                <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Foreground="#E2E8F0" Text="• 当前先接入架构级预览执行器，后续继续补真实视觉和硬件输入模块。" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" Style="{StaticResource GlassPanelStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="运行日志" />
+                    <TextBlock Grid.Column="1" Foreground="#94A3B8" Text="{Binding LogSummaryText}" />
+                </Grid>
+
+                <ListBox Grid.Row="1"
+                         Margin="0,14,0,0"
+                         Background="#0F172A"
+                         BorderThickness="0"
+                         Foreground="#E2E8F0"
+                         ItemsSource="{Binding Logs}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type viewModels:LogEntryViewModel}">
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Foreground="#94A3B8" Text="{Binding TimeText}" />
+                                <TextBlock Grid.Column="1" Foreground="{Binding LevelBrush}" Text="{Binding Level}" />
+                                <TextBlock Grid.Column="2" Text="{Binding Message}" TextWrapping="Wrap" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
