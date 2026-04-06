@@ -1,5 +1,7 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using VisionFlowStudio.Core.Models;
 
 namespace VisionFlowStudio.App.ViewModels;
@@ -77,11 +79,13 @@ public sealed class FlowNodeViewModel : ObservableObject
     private Thickness _borderThicknessValue = new(1);
     private string _settingsEditorText = string.Empty;
     private double _opacityValue = 1.0d;
+    private BitmapSource? _assetPreviewImage;
 
     public FlowNodeViewModel(FlowNode model)
     {
         _model = model;
         _settingsEditorText = BuildSettingsEditorText();
+        RefreshAssetPreview();
         UpdatePalette();
     }
 
@@ -281,6 +285,22 @@ public sealed class FlowNodeViewModel : ObservableObject
         get => _opacityValue;
         private set => SetProperty(ref _opacityValue, value);
     }
+
+    public BitmapSource? AssetPreviewImage
+    {
+        get => _assetPreviewImage;
+        private set
+        {
+            if (!SetProperty(ref _assetPreviewImage, value))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(HasAssetPreview));
+        }
+    }
+
+    public bool HasAssetPreview => AssetPreviewImage is not null;
 
     public bool IsTemporarilyDisabled
     {
@@ -574,6 +594,7 @@ public sealed class FlowNodeViewModel : ObservableObject
     public void RefreshFromModel()
     {
         _settingsEditorText = BuildSettingsEditorText();
+        RefreshAssetPreview();
         OnPropertyChanged(nameof(SettingsEditorText));
         OnPropertyChanged(nameof(TimeoutMs));
         OnPropertyChanged(nameof(RetryLimit));
@@ -696,6 +717,34 @@ public sealed class FlowNodeViewModel : ObservableObject
         OnPropertyChanged(nameof(OutputY));
         OnPropertyChanged(nameof(CenterX));
         OnPropertyChanged(nameof(CenterY));
+    }
+
+    private void RefreshAssetPreview()
+    {
+        if (string.IsNullOrWhiteSpace(_model.AssetPayloadBase64))
+        {
+            AssetPreviewImage = null;
+            return;
+        }
+
+        try
+        {
+            var bytes = Convert.FromBase64String(_model.AssetPayloadBase64);
+            using var stream = new MemoryStream(bytes);
+
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.StreamSource = stream;
+            bitmap.EndInit();
+            bitmap.Freeze();
+
+            AssetPreviewImage = bitmap;
+        }
+        catch
+        {
+            AssetPreviewImage = null;
+        }
     }
 
     private void UpdatePalette()
