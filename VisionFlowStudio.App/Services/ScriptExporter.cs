@@ -20,21 +20,32 @@ public static class ScriptExporter
 
         return $@"@echo off
 chcp 65001 >nul
-REM VisionFlow Studio 自动化脚本
-REM 生成时间: {generatedAt}
-REM 项目文件: {projectFileName}
+REM VisionFlow Studio Automation Script
+REM Generated: {generatedAt}
+REM Project: {projectFileName}
 
 set ""APP_PATH={appPath}""
 set ""PROJECT_PATH=%~dp0{projectFileName}""
 
 if not exist ""%PROJECT_PATH%"" (
-    echo 错误：项目文件不存在
-    echo 路径：%PROJECT_PATH%
+    echo [ERROR] Project file not found
+    echo Path: %PROJECT_PATH%
     pause
     exit /b 1
 )
 
 ""%APP_PATH%"" --execute ""%PROJECT_PATH%"" --silent --notify
+set EXIT_CODE=%ERRORLEVEL%
+
+if %EXIT_CODE% neq 0 (
+    echo.
+    echo [FAILED] Exit code: %EXIT_CODE%
+) else (
+    echo.
+    echo [SUCCESS] Execution completed
+)
+
+pause
 ";
     }
 
