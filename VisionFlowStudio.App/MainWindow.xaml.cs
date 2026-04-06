@@ -31,6 +31,7 @@ public partial class MainWindow : Window
 
         DataContext = new MainViewModel(
             new JsonProjectStorageService(),
+            new JsonNodeTemplateLibraryService(),
             new PreviewFlowExecutionEngine(),
             new DesktopFlowExecutionEngine(visionMatcherService, inputSimulationService),
             screenCaptureService,
@@ -76,16 +77,20 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (DataContext is MainViewModel viewModel)
+        {
+            var handledByConnectionMode = viewModel.TryHandleNodeClick(nodeViewModel);
+            if (handledByConnectionMode)
+            {
+                e.Handled = true;
+                return;
+            }
+        }
+
         _draggingNode = nodeViewModel;
         _dragOriginPoint = e.GetPosition(DesignerSurface);
         _nodeOriginX = nodeViewModel.X;
         _nodeOriginY = nodeViewModel.Y;
-
-        if (DataContext is MainViewModel viewModel)
-        {
-            viewModel.SelectedNode = nodeViewModel;
-        }
-
         nodeViewModel.IsSelected = true;
         Mouse.Capture((IInputElement)sender);
         e.Handled = true;
@@ -114,6 +119,67 @@ public partial class MainWindow : Window
 
         Mouse.Capture(null);
         _draggingNode = null;
+        e.Handled = true;
+    }
+
+    private void DesignerScrollViewer_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+    {
+        if ((Keyboard.Modifiers & ModifierKeys.Control) == 0 || DataContext is not MainViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.AdjustZoom(e.Delta > 0 ? 0.1d : -0.1d);
+        e.Handled = true;
+    }
+
+    private void Connection_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: DesignerConnectionViewModel connectionViewModel }
+            || DataContext is not MainViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.SelectConnection(connectionViewModel);
+        e.Handled = true;
+    }
+
+    private void CanvasRightResizeThumb_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+    {
+        if (DataContext is not MainViewModel viewModel)
+        {
+            return;
+        }
+
+        var delta = e.HorizontalChange / Math.Max(viewModel.ZoomScale, 0.1d);
+        viewModel.ResizeDesignerCanvas(viewModel.DesignerCanvasWidth + delta, null);
+        e.Handled = true;
+    }
+
+    private void CanvasBottomResizeThumb_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+    {
+        if (DataContext is not MainViewModel viewModel)
+        {
+            return;
+        }
+
+        var delta = e.VerticalChange / Math.Max(viewModel.ZoomScale, 0.1d);
+        viewModel.ResizeDesignerCanvas(null, viewModel.DesignerCanvasHeight + delta);
+        e.Handled = true;
+    }
+
+    private void CanvasCornerResizeThumb_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+    {
+        if (DataContext is not MainViewModel viewModel)
+        {
+            return;
+        }
+
+        var scale = Math.Max(viewModel.ZoomScale, 0.1d);
+        viewModel.ResizeDesignerCanvas(
+            viewModel.DesignerCanvasWidth + (e.HorizontalChange / scale),
+            viewModel.DesignerCanvasHeight + (e.VerticalChange / scale));
         e.Handled = true;
     }
 

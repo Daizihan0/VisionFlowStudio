@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
         xmlns:viewModels="clr-namespace:VisionFlowStudio.App.ViewModels"
         mc:Ignorable="d"
         Title="VisionFlow Studio"
@@ -14,6 +15,8 @@
         Foreground="#E2E8F0"
         WindowStartupLocation="CenterScreen">
     <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+
         <Style x:Key="GlassPanelStyle" TargetType="Border">
             <Setter Property="Background" Value="#111A2C" />
             <Setter Property="BorderBrush" Value="#24324B" />
@@ -58,6 +61,174 @@
         <Style x:Key="NodeButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
             <Setter Property="Margin" Value="0,0,0,10" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
+        </Style>
+
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="Foreground" Value="#CBD5E1" />
+        </Style>
+
+        <Style x:Key="FieldTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Background" Value="#0F172A" />
+            <Setter Property="BorderBrush" Value="#334155" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="#E2E8F0" />
+        </Style>
+
+        <Style x:Key="FieldComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Background" Value="#0F172A" />
+            <Setter Property="BorderBrush" Value="#334155" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="#E2E8F0" />
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="DropDownToggle"
+                                          Focusable="False"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          HorizontalAlignment="Stretch"
+                                          VerticalAlignment="Stretch"
+                                          ClickMode="Press"
+                                          OverridesDefaultStyle="True"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <ContentPresenter HorizontalAlignment="Stretch"
+                                                          VerticalAlignment="Stretch" />
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                                <Border x:Name="MainBorder"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        CornerRadius="10">
+                                    <Grid Margin="{TemplateBinding Padding}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="24" />
+                                        </Grid.ColumnDefinitions>
+                                        <ContentPresenter Grid.Column="0"
+                                                          Margin="2,0,8,0"
+                                                          VerticalAlignment="Center"
+                                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                          Content="{TemplateBinding SelectionBoxItem}"
+                                                          ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                          ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                                          RecognizesAccessKey="True"
+                                                          IsHitTestVisible="False"
+                                                          TextElement.Foreground="{TemplateBinding Foreground}" />
+                                        <Path Grid.Column="1"
+                                              Width="10"
+                                              Height="6"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Data="M 0 0 L 5 6 L 10 0 Z"
+                                              Fill="#CBD5E1" />
+                                    </Grid>
+                                </Border>
+                            </ToggleButton>
+                            <Popup x:Name="Popup"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                                   Placement="Bottom"
+                                   PopupAnimation="Slide">
+                                <Border Margin="0,6,0,0"
+                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        MaxHeight="320"
+                                        Background="#0F172A"
+                                        BorderBrush="#334155"
+                                        BorderThickness="1"
+                                        CornerRadius="10">
+                                    <ScrollViewer Margin="4"
+                                                  SnapsToDevicePixels="True">
+                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="#45608D" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="#60A5FA" />
+                            </Trigger>
+                            <Trigger Property="IsDropDownOpen" Value="True">
+                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="#60A5FA" />
+                            </Trigger>
+                            <Trigger Property="HasItems" Value="False">
+                                <Setter TargetName="MainBorder" Property="Opacity" Value="0.7" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Foreground" Value="#E2E8F0" />
+                        <Setter Property="Background" Value="#0F172A" />
+                        <Setter Property="Padding" Value="8,6" />
+                        <Style.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter Property="Background" Value="#20304D" />
+                                <Setter Property="Foreground" Value="#F8FAFC" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="#2C4A73" />
+                                <Setter Property="Foreground" Value="#F8FAFC" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+            <Style.Resources>
+                <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#E2E8F0" />
+                <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#E2E8F0" />
+                <SolidColorBrush x:Key="{x:Static SystemColors.GrayTextBrushKey}" Color="#94A3B8" />
+                <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#0F172A" />
+                <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#0F172A" />
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#2C4A73" />
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#F8FAFC" />
+                <Style TargetType="TextBlock">
+                    <Setter Property="Foreground" Value="#E2E8F0" />
+                </Style>
+            </Style.Resources>
+        </Style>
+
+        <Style x:Key="CanvasResizeThumbStyle" TargetType="primitives:Thumb">
+            <Setter Property="Background" Value="#3B82F6" />
+            <Setter Property="Opacity" Value="0.18" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="primitives:Thumb">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="6" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="0.55" />
+                </Trigger>
+                <Trigger Property="IsDragging" Value="True">
+                    <Setter Property="Opacity" Value="0.78" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
     </Window.Resources>
 
@@ -128,6 +299,38 @@
                         <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddSubFlowNodeCommand}" Content="🎞 录制片段节点" />
                         <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddEndNodeCommand}" Content="🏁 结束节点" />
 
+                        <TextBlock Margin="0,18,0,6" FontSize="15" FontWeight="SemiBold" Text="复用节点库" />
+                        <TextBlock Foreground="#94A3B8" Text="{Binding NodeTemplateSummaryText}" TextWrapping="Wrap" />
+                        <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding NodeTemplates}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,10" Padding="12" Background="#131E31" CornerRadius="12" BorderBrush="#24324B" BorderThickness="1">
+                                        <StackPanel>
+                                            <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
+                                            <TextBlock Margin="0,4,0,0" Foreground="#94A3B8" Text="{Binding KindLabel}" />
+                                            <TextBlock Margin="0,6,0,10" Text="{Binding Description}" TextWrapping="Wrap" />
+                                            <UniformGrid Columns="2">
+                                                <Button Style="{StaticResource ToolbarButtonStyle}"
+                                                        Margin="0,0,8,0"
+                                                        Padding="10,6"
+                                                        HorizontalAlignment="Left"
+                                                        Command="{Binding DataContext.InsertNodeTemplateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        Content="插入到当前项目" />
+                                                <Button Style="{StaticResource ToolbarButtonStyle}"
+                                                        Margin="8,0,0,0"
+                                                        Padding="10,6"
+                                                        HorizontalAlignment="Left"
+                                                        Command="{Binding DataContext.DeleteNodeTemplateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        Content="删除模板" />
+                                            </UniformGrid>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
                         <TextBlock Margin="0,18,0,10" FontSize="15" FontWeight="SemiBold" Text="资源概览" />
                         <ItemsControl ItemsSource="{Binding AssetItems}">
                             <ItemsControl.ItemTemplate>
@@ -179,6 +382,18 @@
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding ZoomOutCommand}" Content="缩小" />
+                                <Border Margin="0,0,8,0" Padding="10,4" Background="#172033" CornerRadius="999" VerticalAlignment="Center">
+                                    <TextBlock Foreground="#F8FAFC" Text="{Binding ZoomPercentText}" />
+                                </Border>
+                                <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding ResetZoomCommand}" Content="100%" />
+                                <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding ZoomInCommand}" Content="放大" />
+                                <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding BeginConnectionCommand}" Content="开始连线" />
+                                <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding CancelConnectionCommand}" Content="取消连线" />
+                                <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding DeleteSelectedConnectionCommand}" Content="删除连线" />
+                                <Border Margin="0,0,8,0" Padding="10,4" Background="#172033" CornerRadius="999" VerticalAlignment="Center">
+                                    <TextBlock Foreground="#F8FAFC" Text="{Binding ConnectionModeText}" />
+                                </Border>
                                 <Border Margin="0,0,8,0" Padding="10,4" Background="#172033" CornerRadius="999">
                                     <TextBlock Foreground="#F8FAFC" Text="F9 停止录制" />
                                 </Border>
@@ -190,14 +405,24 @@
                     </Border>
 
                     <ScrollViewer Grid.Row="1"
+                                  x:Name="DesignerScrollViewer"
                                   HorizontalScrollBarVisibility="Auto"
                                   VerticalScrollBarVisibility="Auto"
-                                  Background="#0C1423">
-                        <Canvas x:Name="DesignerSurface"
-                                Width="1800"
-                                Height="1100"
-                                Background="#0C1423"
-                                ClipToBounds="False">
+                                  Background="#0C1423"
+                                  PreviewMouseWheel="DesignerScrollViewer_PreviewMouseWheel">
+                        <Grid Width="{Binding DesignerCanvasWidth}"
+                              Height="{Binding DesignerCanvasHeight}"
+                              Background="#0C1423"
+                              ClipToBounds="False">
+                            <Grid.LayoutTransform>
+                                <ScaleTransform ScaleX="{Binding ZoomScale}"
+                                                ScaleY="{Binding ZoomScale}" />
+                            </Grid.LayoutTransform>
+                            <Canvas x:Name="DesignerSurface"
+                                    Width="{Binding DesignerCanvasWidth}"
+                                    Height="{Binding DesignerCanvasHeight}"
+                                    Background="#0C1423"
+                                    ClipToBounds="False">
                             <ItemsControl ItemsSource="{Binding Connections}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
@@ -209,15 +434,20 @@
                                         <Canvas>
                                             <Path Data="{Binding PathData}"
                                                   Stroke="{Binding StrokeBrush}"
-                                                  StrokeThickness="3"
+                                                  StrokeThickness="{Binding StrokeThickness}"
                                                   Opacity="0.95" />
+                                            <Path Data="{Binding PathData}"
+                                                  Stroke="Transparent"
+                                                  StrokeThickness="14"
+                                                  MouseLeftButtonDown="Connection_MouseLeftButtonDown" />
                                             <Border Canvas.Left="{Binding LabelX}"
                                                     Canvas.Top="{Binding LabelY}"
                                                     Padding="8,3"
-                                                    Background="#0F172A"
-                                                    BorderBrush="#334155"
+                                                    Background="{Binding LabelBackgroundBrush}"
+                                                    BorderBrush="{Binding LabelBorderBrush}"
                                                     BorderThickness="1"
-                                                    CornerRadius="999">
+                                                    CornerRadius="999"
+                                                    MouseLeftButtonDown="Connection_MouseLeftButtonDown">
                                                 <TextBlock FontSize="11"
                                                            Foreground="{Binding StrokeBrush}"
                                                            Text="{Binding Label}" />
@@ -244,6 +474,7 @@
                                         <Border Width="{Binding Width}"
                                                 Height="{Binding Height}"
                                                 Background="{Binding SurfaceBrush}"
+                                                Opacity="{Binding OpacityValue}"
                                                 BorderBrush="{Binding BorderBrush}"
                                                 BorderThickness="{Binding BorderThicknessValue}"
                                                 CornerRadius="18"
@@ -312,7 +543,30 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                        </Canvas>
+                            </Canvas>
+
+                            <primitives:Thumb Style="{StaticResource CanvasResizeThumbStyle}"
+                                              Width="12"
+                                              HorizontalAlignment="Right"
+                                              VerticalAlignment="Stretch"
+                                              Cursor="SizeWE"
+                                              DragDelta="CanvasRightResizeThumb_DragDelta" />
+
+                            <primitives:Thumb Style="{StaticResource CanvasResizeThumbStyle}"
+                                              Height="12"
+                                              HorizontalAlignment="Stretch"
+                                              VerticalAlignment="Bottom"
+                                              Cursor="SizeNS"
+                                              DragDelta="CanvasBottomResizeThumb_DragDelta" />
+
+                            <primitives:Thumb Style="{StaticResource CanvasResizeThumbStyle}"
+                                              Width="18"
+                                              Height="18"
+                                              HorizontalAlignment="Right"
+                                              VerticalAlignment="Bottom"
+                                              Cursor="SizeNWSE"
+                                              DragDelta="CanvasCornerResizeThumb_DragDelta" />
+                        </Grid>
                     </ScrollViewer>
                 </Grid>
             </Border>
@@ -328,6 +582,29 @@
                                 <TextBlock FontSize="14" FontWeight="SemiBold" Text="{Binding SelectedNode.Title, TargetNullValue=未选择节点}" />
                                 <TextBlock Margin="0,6,0,0" Foreground="#93C5FD" Text="{Binding SelectedNode.DisplayKind, TargetNullValue=请先点击画布中的节点}" />
                                 <TextBlock Margin="0,6,0,0" Foreground="#CBD5E1" Text="{Binding SelectedNode.AssetSummary, TargetNullValue=无截图资源}" />
+                            </StackPanel>
+                        </Border>
+
+                        <UniformGrid Margin="0,16,0,0" Columns="2">
+                            <Button Style="{StaticResource ToolbarButtonStyle}"
+                                    Margin="0,0,8,0"
+                                    Command="{Binding SaveSelectedNodeAsTemplateCommand}"
+                                    Content="保存为复用节点" />
+                            <Button Style="{StaticResource ToolbarButtonStyle}"
+                                    Margin="8,0,0,0"
+                                    Command="{Binding DeleteSelectedNodeCommand}"
+                                    Content="删除当前节点" />
+                        </UniformGrid>
+
+                        <Border Margin="0,16,0,0" Background="#131E31" CornerRadius="14" Padding="14">
+                            <StackPanel>
+                                <CheckBox Foreground="#E2E8F0"
+                                          IsChecked="{Binding SelectedNode.IsTemporarilyDisabled, UpdateSourceTrigger=PropertyChanged}"
+                                          Content="临时停用这个节点 / 分支入口" />
+                                <TextBlock Margin="0,8,0,0"
+                                           Foreground="#94A3B8"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding SelectedNodeDisableHint}" />
                             </StackPanel>
                         </Border>
 
@@ -356,16 +633,268 @@
                             </StackPanel>
                         </UniformGrid>
 
-                        <TextBlock Margin="0,16,0,8" Foreground="#CBD5E1" Text="节点参数（每行 key=value）" />
+                        <TextBlock Margin="0,16,0,8" Foreground="#CBD5E1" Text="节点配置表单" />
+
+                        <Border Background="#131E31"
+                                CornerRadius="14"
+                                Padding="14"
+                                Visibility="{Binding SelectedNode.IsStartNode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabelStyle}" Text="目标窗口" />
+                                <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                         Text="{Binding SelectedNode.TargetWindow, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="附着方式" />
+                                <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                          ItemsSource="{Binding SelectedNode.AttachModeOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding SelectedNode.AttachMode, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#131E31"
+                                CornerRadius="14"
+                                Padding="14"
+                                Visibility="{Binding SelectedNode.IsActionNode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabelStyle}" Text="动作类型" />
+                                <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                          ItemsSource="{Binding SelectedNode.ActionTypeOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding SelectedNode.ActionType, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="目标位置来源" />
+                                <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                          ItemsSource="{Binding SelectedNode.TargetModeOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding SelectedNode.TargetMode, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="执行前等待（毫秒）" />
+                                <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                         Text="{Binding SelectedNode.BeforeActionDelayMsValue, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="执行后等待（毫秒）" />
+                                <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                         Text="{Binding SelectedNode.AfterActionDelayMsValue, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <StackPanel Margin="0,12,0,0"
+                                            Visibility="{Binding SelectedNode.ShowActionOffsetInput, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="偏移量（x,y）" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.ClickOffset, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,12,0,0"
+                                            Visibility="{Binding SelectedNode.ShowActionPointInput, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="绝对坐标（x,y）" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.PointValue, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,12,0,0"
+                                            Visibility="{Binding SelectedNode.ShowActionTextInput, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="输入文字内容" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.ActionTextValue, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,12,0,0"
+                                            Visibility="{Binding SelectedNode.ShowActionHotkeyInput, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="快捷键" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.HotkeyValue, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#131E31"
+                                CornerRadius="14"
+                                Padding="14"
+                                Visibility="{Binding SelectedNode.IsVisionNode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabelStyle}" Text="识别阈值" />
+                                <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                         Text="{Binding SelectedNode.ThresholdValue, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="搜索范围" />
+                                <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                          ItemsSource="{Binding SelectedNode.SearchRegionOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding SelectedNode.SearchRegion, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#131E31"
+                                CornerRadius="14"
+                                Padding="14"
+                                Visibility="{Binding SelectedNode.IsWaitNode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabelStyle}" Text="等待方式" />
+                                <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                          ItemsSource="{Binding SelectedNode.WaitTypeOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding SelectedNode.WaitType, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <StackPanel Margin="0,12,0,0"
+                                            Visibility="{Binding SelectedNode.ShowWaitDurationInput, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="等待时长（毫秒）" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.DurationMsValue, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,12,0,0"
+                                            Visibility="{Binding SelectedNode.ShowWaitImageOptions, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="图片匹配阈值" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.ThresholdValue, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,12,0,0"
+                                            Visibility="{Binding SelectedNode.ShowWaitPixelOptions, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="像素坐标（x,y）" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.PointValue, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="目标颜色" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.PixelColorValue, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="颜色容差" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.ToleranceValue, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#131E31"
+                                CornerRadius="14"
+                                Padding="14"
+                                Visibility="{Binding SelectedNode.IsConditionNode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabelStyle}" Text="判断方式" />
+                                <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                          ItemsSource="{Binding SelectedNode.ConditionTypeOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding SelectedNode.ConditionType, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="预览默认分支" />
+                                <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                          ItemsSource="{Binding SelectedNode.ExpectedStateOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding SelectedNode.ExpectedState, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <StackPanel Margin="0,12,0,0"
+                                            Visibility="{Binding SelectedNode.ShowConditionImageOptions, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="图片匹配阈值" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.ThresholdValue, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,12,0,0"
+                                            Visibility="{Binding SelectedNode.ShowConditionPixelOptions, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="像素坐标（x,y）" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.PointValue, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="目标颜色" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.PixelColorValue, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="颜色容差" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.ToleranceValue, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#131E31"
+                                CornerRadius="14"
+                                Padding="14"
+                                Visibility="{Binding SelectedNode.IsSubFlowNode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabelStyle}" Text="片段名称" />
+                                <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                         Text="{Binding SelectedNode.ClipName, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="播放模式" />
+                                <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                          ItemsSource="{Binding SelectedNode.PlaybackModeOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding SelectedNode.PlaybackMode, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="已录制事件数" />
+                                <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                         IsReadOnly="True"
+                                         Text="{Binding SelectedNode.RecordedEventCountText, Mode=OneWay}" />
+                                <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="录制总时长（毫秒）" />
+                                <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                         IsReadOnly="True"
+                                         Text="{Binding SelectedNode.RecordedDurationMsText, Mode=OneWay}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#131E31"
+                                CornerRadius="14"
+                                Padding="14"
+                                Visibility="{Binding SelectedNode.IsEndNode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabelStyle}" Text="结束后动作" />
+                                <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                          ItemsSource="{Binding SelectedNode.OnCompleteOptions}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding SelectedNode.OnCompleteAction, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Expander Margin="0,16,0,0"
+                                  Background="#131E31"
+                                  Foreground="#E2E8F0"
+                                  Header="高级参数（兼容旧工程，可选）">
+                            <StackPanel Margin="0,12,0,0">
+                                <TextBlock Margin="0,0,0,8" Foreground="#94A3B8" Text="只有在表单里没有覆盖到的特殊配置，才建议在这里按 key=value 修改。" TextWrapping="Wrap" />
+                                <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                         Padding="12,10"
+                                         Text="{Binding SelectedNode.SettingsEditorText, UpdateSourceTrigger=PropertyChanged}"
+                                         TextWrapping="Wrap"
+                                         AcceptsReturn="True"
+                                         MinHeight="160"
+                                         VerticalScrollBarVisibility="Auto" />
+                            </StackPanel>
+                        </Expander>
+
+                        <TextBlock Margin="0,16,0,8" Foreground="#CBD5E1" Text="{Binding SelectedNodeGuideTitle}" />
+                        <Border Background="#131E31" CornerRadius="14" Padding="14">
+                            <StackPanel>
+                                <TextBlock Foreground="#E2E8F0"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding SelectedNodeGuideText}" />
+                                <TextBlock Margin="0,12,0,0" Foreground="#93C5FD" Text="推荐示例" />
+                                <TextBox Margin="0,8,0,0"
+                                         Padding="12,10"
+                                         Background="#0F172A"
+                                         BorderBrush="#334155"
+                                         BorderThickness="1"
+                                         Foreground="#E2E8F0"
+                                         IsReadOnly="True"
+                                         Text="{Binding SelectedNodeExampleText, Mode=OneWay}"
+                                         TextWrapping="Wrap"
+                                         AcceptsReturn="True"
+                                         MinHeight="88" />
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Margin="0,16,0,8" Foreground="#CBD5E1" Text="每个参数是什么意思" />
                         <TextBox Padding="12,10"
                                  Background="#0F172A"
                                  BorderBrush="#334155"
                                  BorderThickness="1"
                                  Foreground="#E2E8F0"
-                                 Text="{Binding SelectedNode.SettingsEditorText, UpdateSourceTrigger=PropertyChanged}"
+                                 IsReadOnly="True"
+                                 Text="{Binding SelectedNodeParameterDefinitionsText, Mode=OneWay}"
                                  TextWrapping="Wrap"
                                  AcceptsReturn="True"
-                                 MinHeight="160"
+                                 MinHeight="280"
                                  VerticalScrollBarVisibility="Auto" />
 
                         <TextBlock Margin="0,16,0,8" Foreground="#CBD5E1" Text="设计提示" />
@@ -373,7 +902,8 @@
                             <StackPanel>
                                 <TextBlock TextWrapping="Wrap" Foreground="#E2E8F0" Text="• 先用录制片段快速生成步骤，再把关键点击替换成截图锚点。" />
                                 <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Foreground="#E2E8F0" Text="• 条件节点可通过 ExpectedState=true/false 决定预览走向。" />
-                                <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Foreground="#E2E8F0" Text="• 当前先接入架构级预览执行器，后续继续补真实视觉和硬件输入模块。" />
+                                <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Foreground="#E2E8F0" Text="• 复用节点会保存截图、录制片段和参数，可在多个项目直接插入。" />
+                                <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Foreground="#E2E8F0" Text="• 临时停用适合排查问题或暂时关闭某条支路，不需要删节点再重连。" />
                             </StackPanel>
                         </Border>
                     </StackPanel>

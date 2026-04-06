@@ -23,4 +23,6 @@ public sealed class FlowNode
     public string? AssetFileName { get; set; }
 
     public List<RecordedInputEvent> RecordedEvents { get; set; } = [];
+
+    public bool IsTemporarilyDisabled { get; set; }
 }

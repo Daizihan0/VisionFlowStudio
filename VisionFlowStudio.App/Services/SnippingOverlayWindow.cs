@@ -20,6 +20,9 @@ public sealed class SnippingOverlayWindow : Window
     private readonly ShapeRectangle _selectionRectangle;
     private readonly Border _tip;
     private readonly TextBlock _tipText;
+    private readonly DpiScale _dpiScale;
+    private readonly double _surfaceWidth;
+    private readonly double _surfaceHeight;
     private WpfPoint _selectionStart;
     private bool _isDragging;
 
@@ -27,41 +30,49 @@ public sealed class SnippingOverlayWindow : Window
     {
         _screenshot = screenshot;
         _virtualBounds = virtualBounds;
+        _dpiScale = OverlayDpiHelper.GetDpiScale();
+        _surfaceWidth = OverlayDpiHelper.PixelsToDipX(virtualBounds.Width, _dpiScale);
+        _surfaceHeight = OverlayDpiHelper.PixelsToDipY(virtualBounds.Height, _dpiScale);
 
-        Left = virtualBounds.Left;
-        Top = virtualBounds.Top;
-        Width = virtualBounds.Width;
-        Height = virtualBounds.Height;
+        Left = OverlayDpiHelper.PixelsToDipX(virtualBounds.Left, _dpiScale);
+        Top = OverlayDpiHelper.PixelsToDipY(virtualBounds.Top, _dpiScale);
+        Width = _surfaceWidth;
+        Height = _surfaceHeight;
         WindowStyle = WindowStyle.None;
+        WindowStartupLocation = WindowStartupLocation.Manual;
         ResizeMode = ResizeMode.NoResize;
         AllowsTransparency = true;
-        Background = System.Windows.Media.Brushes.Transparent;
+        Background = Brushes.Transparent;
         Topmost = true;
         ShowInTaskbar = false;
         Cursor = Cursors.Cross;
 
-        _canvas = new Canvas();
+        _canvas = new Canvas
+        {
+            Width = _surfaceWidth,
+            Height = _surfaceHeight
+        };
         Content = _canvas;
 
-        _canvas.Children.Add(new System.Windows.Controls.Image
+        _canvas.Children.Add(new Image
         {
             Source = BitmapConversionHelper.ToBitmapSource(_screenshot),
             Stretch = Stretch.Fill,
-            Width = virtualBounds.Width,
-            Height = virtualBounds.Height,
+            Width = _surfaceWidth,
+            Height = _surfaceHeight,
             Opacity = 0.96
         });
 
         _canvas.Children.Add(new ShapeRectangle
         {
-            Width = virtualBounds.Width,
-            Height = virtualBounds.Height,
+            Width = _surfaceWidth,
+            Height = _surfaceHeight,
             Fill = new SolidColorBrush(MediaColor.FromArgb(68, 5, 10, 20))
         });
 
         _selectionRectangle = new ShapeRectangle
         {
-            Stroke = System.Windows.Media.Brushes.DeepSkyBlue,
+            Stroke = Brushes.DeepSkyBlue,
             StrokeThickness = 2,
             Fill = new SolidColorBrush(MediaColor.FromArgb(50, 56, 189, 248)),
             Visibility = Visibility.Collapsed
@@ -70,14 +81,14 @@ public sealed class SnippingOverlayWindow : Window
 
         _tipText = new TextBlock
         {
-            Foreground = System.Windows.Media.Brushes.White,
+            Foreground = Brushes.White,
             FontSize = 13,
             FontWeight = FontWeights.SemiBold
         };
         _tip = new Border
         {
             Background = new SolidColorBrush(MediaColor.FromArgb(220, 15, 23, 42)),
-            BorderBrush = System.Windows.Media.Brushes.DeepSkyBlue,
+            BorderBrush = Brushes.DeepSkyBlue,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(10),
             Padding = new Thickness(10, 6, 10, 6),
@@ -162,20 +173,25 @@ public sealed class SnippingOverlayWindow : Window
     private void UpdateTip(WpfPoint point, System.Windows.Rect? selectionRect)
     {
         _tipText.Text = selectionRect is { } rect
-            ? $"宽 {Math.Round(rect.Width)} × 高 {Math.Round(rect.Height)}"
+            ? $"宽 {Math.Round(OverlayDpiHelper.DipToPixelsX(rect.Width, _dpiScale))} × 高 {Math.Round(OverlayDpiHelper.DipToPixelsY(rect.Height, _dpiScale))}"
             : "拖动鼠标框选区域，Esc 取消";
 
-        Canvas.SetLeft(_tip, Math.Min(point.X + 16, Math.Max(0, ActualWidth - 220)));
-        Canvas.SetTop(_tip, Math.Min(point.Y + 16, Math.Max(0, ActualHeight - 48)));
+        Canvas.SetLeft(_tip, Math.Min(point.X + 16, Math.Max(0, _surfaceWidth - 220)));
+        Canvas.SetTop(_tip, Math.Min(point.Y + 16, Math.Max(0, _surfaceHeight - 48)));
     }
 
     private DrawingBitmap Crop(System.Windows.Rect rect)
     {
         var sourceRect = new DrawingRect(
-            x: (int)Math.Round(rect.X),
-            y: (int)Math.Round(rect.Y),
-            width: (int)Math.Round(rect.Width),
-            height: (int)Math.Round(rect.Height));
+            x: (int)Math.Round(OverlayDpiHelper.DipToPixelsX(rect.X, _dpiScale)),
+            y: (int)Math.Round(OverlayDpiHelper.DipToPixelsY(rect.Y, _dpiScale)),
+            width: (int)Math.Round(OverlayDpiHelper.DipToPixelsX(rect.Width, _dpiScale)),
+            height: (int)Math.Round(OverlayDpiHelper.DipToPixelsY(rect.Height, _dpiScale)));
+
+        sourceRect.X = Math.Clamp(sourceRect.X, 0, _screenshot.Width - 1);
+        sourceRect.Y = Math.Clamp(sourceRect.Y, 0, _screenshot.Height - 1);
+        sourceRect.Width = Math.Clamp(sourceRect.Width, 1, _screenshot.Width - sourceRect.X);
+        sourceRect.Height = Math.Clamp(sourceRect.Height, 1, _screenshot.Height - sourceRect.Y);
 
         var target = new DrawingBitmap(sourceRect.Width, sourceRect.Height);
         using var graphics = DrawingGraphics.FromImage(target);

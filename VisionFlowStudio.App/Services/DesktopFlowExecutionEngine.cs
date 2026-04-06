@@ -24,14 +24,14 @@ public sealed class DesktopFlowExecutionEngine : IFlowExecutionEngine
         CancellationToken cancellationToken)
     {
         var graph = project.Graph;
-        var current = graph.Nodes.FirstOrDefault(node => node.Kind == FlowNodeKind.Start) ?? graph.Nodes.FirstOrDefault();
+        var nodeLookup = graph.Nodes.ToDictionary(node => node.Id);
+        var current = ResolveEntryNode(graph, nodeLookup);
         if (current is null)
         {
-            onLog(Log("警告", "流程为空，无法执行真实运行。"));
+            onLog(Log("警告", "流程为空，或所有入口节点都已被停用。"));
             return;
         }
 
-        var nodeLookup = graph.Nodes.ToDictionary(node => node.Id);
         var runtime = new RuntimeState();
         var guard = 0;
 
@@ -47,6 +47,19 @@ public sealed class DesktopFlowExecutionEngine : IFlowExecutionEngine
                 return;
             }
 
+            if (current.IsTemporarilyDisabled)
+            {
+                onLog(Log("信息", $"节点“{current.Title}”已临时停用，已跳过。", current.Id));
+                var disabledNext = SelectNextConnection(graph.Connections, current, runtime.LastConditionResult, nodeLookup);
+                if (disabledNext is null || !nodeLookup.TryGetValue(disabledNext.TargetNodeId, out current))
+                {
+                    onLog(Log("信息", "流程已到达末端。"));
+                    return;
+                }
+
+                continue;
+            }
+
             onNodeStatusChanged(current.Id, NodeStatus.Running);
 
             try
@@ -59,7 +72,10 @@ public sealed class DesktopFlowExecutionEngine : IFlowExecutionEngine
                 onNodeStatusChanged(current.Id, NodeStatus.Failed);
                 onLog(Log("错误", $"节点“{current.Title}”执行失败：{ex.Message}", current.Id));
 
-                var failureNext = graph.Connections.FirstOrDefault(connection => connection.SourceNodeId == current.Id && connection.ConnectorKind == FlowConnectorKind.Failure);
+                var failureNext = graph.Connections.FirstOrDefault(connection =>
+                    connection.SourceNodeId == current.Id
+                    && connection.ConnectorKind == FlowConnectorKind.Failure
+                    && (!nodeLookup.TryGetValue(connection.TargetNodeId, out var targetNode) || !targetNode.IsTemporarilyDisabled));
                 if (failureNext is null || !nodeLookup.TryGetValue(failureNext.TargetNodeId, out current))
                 {
                     return;
@@ -74,7 +90,7 @@ public sealed class DesktopFlowExecutionEngine : IFlowExecutionEngine
                 return;
             }
 
-            var next = SelectNextConnection(graph.Connections, current, runtime.LastConditionResult);
+            var next = SelectNextConnection(graph.Connections, current, runtime.LastConditionResult, nodeLookup);
             if (next is null || !nodeLookup.TryGetValue(next.TargetNodeId, out current))
             {
                 onLog(Log("信息", "流程已到达末端。"));
@@ -136,6 +152,12 @@ public sealed class DesktopFlowExecutionEngine : IFlowExecutionEngine
 
     private async Task ExecuteActionNodeAsync(FlowNode node, RuntimeState runtime, CancellationToken cancellationToken)
     {
+        var beforeDelayMs = GetInt(node.Settings, "BeforeActionDelayMs", 0);
+        if (beforeDelayMs > 0)
+        {
+            await Task.Delay(beforeDelayMs, cancellationToken);
+        }
+
         var actionType = GetString(node.Settings, "ActionType", "LeftClick");
         var targetMode = GetString(node.Settings, "TargetMode", "AnchorCenter");
         var targetPoint = ResolveTargetPoint(targetMode, node, runtime);
@@ -168,6 +190,12 @@ public sealed class DesktopFlowExecutionEngine : IFlowExecutionEngine
                 break;
             default:
                 throw new InvalidOperationException($"不支持的动作类型：{actionType}");
+        }
+
+        var afterDelayMs = GetInt(node.Settings, "AfterActionDelayMs", 0);
+        if (afterDelayMs > 0)
+        {
+            await Task.Delay(afterDelayMs, cancellationToken);
         }
     }
 
@@ -286,7 +314,30 @@ public sealed class DesktopFlowExecutionEngine : IFlowExecutionEngine
         }
     }
 
-    private static FlowConnection? SelectNextConnection(IEnumerable<FlowConnection> connections, FlowNode current, bool? conditionResult)
+    private static FlowNode? ResolveEntryNode(FlowGraph graph, IReadOnlyDictionary<Guid, FlowNode> nodeLookup)
+    {
+        var startNode = graph.Nodes.FirstOrDefault(node => node.Kind == FlowNodeKind.Start) ?? graph.Nodes.FirstOrDefault();
+        if (startNode is null)
+        {
+            return null;
+        }
+
+        if (!startNode.IsTemporarilyDisabled)
+        {
+            return startNode;
+        }
+
+        var nextConnection = SelectNextConnection(graph.Connections, startNode, conditionResult: null, nodeLookup);
+        return nextConnection is not null && nodeLookup.TryGetValue(nextConnection.TargetNodeId, out var nextNode)
+            ? nextNode
+            : graph.Nodes.FirstOrDefault(node => !node.IsTemporarilyDisabled);
+    }
+
+    private static FlowConnection? SelectNextConnection(
+        IEnumerable<FlowConnection> connections,
+        FlowNode current,
+        bool? conditionResult,
+        IReadOnlyDictionary<Guid, FlowNode> nodeLookup)
     {
         var candidates = connections.Where(connection => connection.SourceNodeId == current.Id).ToList();
         if (candidates.Count == 0)
@@ -294,15 +345,25 @@ public sealed class DesktopFlowExecutionEngine : IFlowExecutionEngine
             return null;
         }
 
+        var enabledCandidates = candidates
+            .Where(connection => !nodeLookup.TryGetValue(connection.TargetNodeId, out var targetNode) || !targetNode.IsTemporarilyDisabled)
+            .ToList();
+
+        if (enabledCandidates.Count == 0)
+        {
+            return null;
+        }
+
         if (current.Kind == FlowNodeKind.Condition)
         {
             var desired = conditionResult == true ? FlowConnectorKind.True : FlowConnectorKind.False;
-            return candidates.FirstOrDefault(connection => connection.ConnectorKind == desired) ?? candidates.FirstOrDefault();
+            return enabledCandidates.FirstOrDefault(connection => connection.ConnectorKind == desired)
+                   ?? enabledCandidates.FirstOrDefault();
         }
 
-        return candidates.FirstOrDefault(connection => connection.ConnectorKind == FlowConnectorKind.Success)
-               ?? candidates.FirstOrDefault(connection => connection.ConnectorKind == FlowConnectorKind.Next)
-               ?? candidates.FirstOrDefault();
+        return enabledCandidates.FirstOrDefault(connection => connection.ConnectorKind == FlowConnectorKind.Success)
+               ?? enabledCandidates.FirstOrDefault(connection => connection.ConnectorKind == FlowConnectorKind.Next)
+               ?? enabledCandidates.FirstOrDefault();
     }
 
     private static Point ResolveTargetPoint(string targetMode, FlowNode node, RuntimeState runtime)

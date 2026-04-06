@@ -23,7 +23,12 @@ public sealed class PreviewFlowExecutionEngine : IFlowExecutionEngine
         }
 
         var nodeLookup = graph.Nodes.ToDictionary(node => node.Id);
-        var current = graph.Nodes.FirstOrDefault(node => node.Kind == FlowNodeKind.Start) ?? graph.Nodes[0];
+        var current = ResolveEntryNode(graph, nodeLookup);
+        if (current is null)
+        {
+            onLog(CreateLog("警告", "所有入口节点都已被停用，无法执行预览。"));
+            return;
+        }
         var visitedSteps = 0;
         const int maxPreviewSteps = 128;
 
@@ -40,10 +45,23 @@ public sealed class PreviewFlowExecutionEngine : IFlowExecutionEngine
                 return;
             }
 
+            if (current.IsTemporarilyDisabled)
+            {
+                onLog(CreateLog("信息", $"节点“{current.Title}”已临时停用，已跳过。", current.Id));
+                var disabledNext = SelectNextConnection(graph.Connections, current, nodeLookup);
+                if (disabledNext is null || !nodeLookup.TryGetValue(disabledNext.TargetNodeId, out current))
+                {
+                    onLog(CreateLog("信息", "流程已到达末端。"));
+                    return;
+                }
+
+                continue;
+            }
+
             onNodeStatusChanged(current.Id, NodeStatus.Running);
             onLog(CreateLog("信息", $"执行节点：{current.Title}", current.Id));
 
-            await Task.Delay(GetPreviewDelay(current.Kind), cancellationToken);
+            await Task.Delay(GetPreviewDelay(current), cancellationToken);
 
             onNodeStatusChanged(current.Id, NodeStatus.Succeeded);
 
@@ -53,7 +71,7 @@ public sealed class PreviewFlowExecutionEngine : IFlowExecutionEngine
                 return;
             }
 
-            var nextConnection = SelectNextConnection(graph.Connections, current);
+            var nextConnection = SelectNextConnection(graph.Connections, current, nodeLookup);
             if (nextConnection is null)
             {
                 onLog(CreateLog("信息", $"节点“{current.Title}”没有后续连线，预览停止。", current.Id));
@@ -71,8 +89,9 @@ public sealed class PreviewFlowExecutionEngine : IFlowExecutionEngine
         }
     }
 
-    private static int GetPreviewDelay(FlowNodeKind kind) =>
-        kind switch
+    private static int GetPreviewDelay(FlowNode node)
+    {
+        var baseDelay = node.Kind switch
         {
             FlowNodeKind.Start => 180,
             FlowNodeKind.Wait => 600,
@@ -83,7 +102,39 @@ public sealed class PreviewFlowExecutionEngine : IFlowExecutionEngine
             _ => 260
         };
 
-    private static FlowConnection? SelectNextConnection(IEnumerable<FlowConnection> connections, FlowNode current)
+        if (node.Kind != FlowNodeKind.Action)
+        {
+            return baseDelay;
+        }
+
+        var beforeDelay = GetInt(node.Settings, "BeforeActionDelayMs", 0);
+        var afterDelay = GetInt(node.Settings, "AfterActionDelayMs", 0);
+        return baseDelay + beforeDelay + afterDelay;
+    }
+
+    private static FlowNode? ResolveEntryNode(FlowGraph graph, IReadOnlyDictionary<Guid, FlowNode> nodeLookup)
+    {
+        var startNode = graph.Nodes.FirstOrDefault(node => node.Kind == FlowNodeKind.Start) ?? graph.Nodes.FirstOrDefault();
+        if (startNode is null)
+        {
+            return null;
+        }
+
+        if (!startNode.IsTemporarilyDisabled)
+        {
+            return startNode;
+        }
+
+        var nextConnection = SelectNextConnection(graph.Connections, startNode, nodeLookup);
+        return nextConnection is not null && nodeLookup.TryGetValue(nextConnection.TargetNodeId, out var nextNode)
+            ? nextNode
+            : graph.Nodes.FirstOrDefault(node => !node.IsTemporarilyDisabled);
+    }
+
+    private static FlowConnection? SelectNextConnection(
+        IEnumerable<FlowConnection> connections,
+        FlowNode current,
+        IReadOnlyDictionary<Guid, FlowNode> nodeLookup)
     {
         var candidates = connections
             .Where(connection => connection.SourceNodeId == current.Id)
@@ -94,21 +145,30 @@ public sealed class PreviewFlowExecutionEngine : IFlowExecutionEngine
             return null;
         }
 
+        var enabledCandidates = candidates
+            .Where(connection => !nodeLookup.TryGetValue(connection.TargetNodeId, out var targetNode) || !targetNode.IsTemporarilyDisabled)
+            .ToList();
+
+        if (enabledCandidates.Count == 0)
+        {
+            return null;
+        }
+
         if (current.Kind == FlowNodeKind.Condition)
         {
             if (current.Settings.TryGetValue("ExpectedState", out var configuredState)
                 && bool.TryParse(configuredState, out var state))
             {
-                return candidates.FirstOrDefault(connection => connection.ConnectorKind == (state ? FlowConnectorKind.True : FlowConnectorKind.False))
-                       ?? candidates[0];
+                return enabledCandidates.FirstOrDefault(connection => connection.ConnectorKind == (state ? FlowConnectorKind.True : FlowConnectorKind.False))
+                       ?? enabledCandidates[0];
             }
 
-            return candidates.FirstOrDefault(connection => connection.ConnectorKind == FlowConnectorKind.True)
-                   ?? candidates[0];
+            return enabledCandidates.FirstOrDefault(connection => connection.ConnectorKind == FlowConnectorKind.True)
+                   ?? enabledCandidates[0];
         }
 
-        return candidates.FirstOrDefault(connection => connection.ConnectorKind is FlowConnectorKind.Next or FlowConnectorKind.Success)
-               ?? candidates[0];
+        return enabledCandidates.FirstOrDefault(connection => connection.ConnectorKind is FlowConnectorKind.Next or FlowConnectorKind.Success)
+               ?? enabledCandidates[0];
     }
 
     private static ExecutionLogEntry CreateLog(string level, string message, Guid? nodeId = null) =>
@@ -119,4 +179,7 @@ public sealed class PreviewFlowExecutionEngine : IFlowExecutionEngine
             Message = message,
             NodeId = nodeId
         };
+
+    private static int GetInt(IReadOnlyDictionary<string, string> settings, string key, int fallback) =>
+        settings.TryGetValue(key, out var value) && int.TryParse(value, out var parsed) ? parsed : fallback;
 }

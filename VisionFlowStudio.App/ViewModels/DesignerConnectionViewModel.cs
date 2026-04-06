@@ -8,6 +8,7 @@ namespace VisionFlowStudio.App.ViewModels;
 public sealed class DesignerConnectionViewModel : ObservableObject
 {
     private readonly FlowConnection _model;
+    private bool _isSelected;
 
     public DesignerConnectionViewModel(FlowConnection model, FlowNodeViewModel sourceNode, FlowNodeViewModel targetNode)
     {
@@ -24,6 +25,23 @@ public sealed class DesignerConnectionViewModel : ObservableObject
     public FlowNodeViewModel TargetNode { get; }
 
     public FlowConnection Model => _model;
+
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (!SetProperty(ref _isSelected, value))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(StrokeBrush));
+            OnPropertyChanged(nameof(StrokeThickness));
+            OnPropertyChanged(nameof(LabelBorderBrush));
+            OnPropertyChanged(nameof(LabelBackgroundBrush));
+        }
+    }
 
     public string Label =>
         !string.IsNullOrWhiteSpace(_model.Label)
@@ -43,14 +61,28 @@ public sealed class DesignerConnectionViewModel : ObservableObject
 
     public Brush StrokeBrush =>
         new SolidColorBrush(
-            _model.ConnectorKind switch
-            {
-                FlowConnectorKind.True => (Color)ColorConverter.ConvertFromString("#4ADE80"),
-                FlowConnectorKind.False => (Color)ColorConverter.ConvertFromString("#F87171"),
-                FlowConnectorKind.Success => (Color)ColorConverter.ConvertFromString("#38BDF8"),
-                FlowConnectorKind.Failure => (Color)ColorConverter.ConvertFromString("#F97316"),
-                _ => (Color)ColorConverter.ConvertFromString("#94A3B8")
-            });
+            IsSelected
+                ? (Color)ColorConverter.ConvertFromString("#F8FAFC")
+                : _model.ConnectorKind switch
+                {
+                    FlowConnectorKind.True => (Color)ColorConverter.ConvertFromString("#4ADE80"),
+                    FlowConnectorKind.False => (Color)ColorConverter.ConvertFromString("#F87171"),
+                    FlowConnectorKind.Success => (Color)ColorConverter.ConvertFromString("#38BDF8"),
+                    FlowConnectorKind.Failure => (Color)ColorConverter.ConvertFromString("#F97316"),
+                    _ => (Color)ColorConverter.ConvertFromString("#94A3B8")
+                });
+
+    public double StrokeThickness => IsSelected ? 5d : 3d;
+
+    public Brush LabelBorderBrush =>
+        IsSelected
+            ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F8FAFC"))
+            : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#334155"));
+
+    public Brush LabelBackgroundBrush =>
+        IsSelected
+            ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#22304A"))
+            : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#0F172A"));
 
     public Geometry PathData
     {

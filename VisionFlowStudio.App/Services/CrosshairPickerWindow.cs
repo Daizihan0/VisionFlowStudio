@@ -20,17 +20,24 @@ public sealed class CrosshairPickerWindow : Window
     private readonly Line _verticalLine;
     private readonly Border _tooltip;
     private readonly TextBlock _tooltipText;
+    private readonly DpiScale _dpiScale;
+    private readonly double _surfaceWidth;
+    private readonly double _surfaceHeight;
 
     public CrosshairPickerWindow(DrawingBitmap screenshot, DrawingRect virtualBounds)
     {
         _screenshot = screenshot;
         _virtualBounds = virtualBounds;
+        _dpiScale = OverlayDpiHelper.GetDpiScale();
+        _surfaceWidth = OverlayDpiHelper.PixelsToDipX(virtualBounds.Width, _dpiScale);
+        _surfaceHeight = OverlayDpiHelper.PixelsToDipY(virtualBounds.Height, _dpiScale);
 
-        Left = virtualBounds.Left;
-        Top = virtualBounds.Top;
-        Width = virtualBounds.Width;
-        Height = virtualBounds.Height;
+        Left = OverlayDpiHelper.PixelsToDipX(virtualBounds.Left, _dpiScale);
+        Top = OverlayDpiHelper.PixelsToDipY(virtualBounds.Top, _dpiScale);
+        Width = _surfaceWidth;
+        Height = _surfaceHeight;
         WindowStyle = WindowStyle.None;
+        WindowStartupLocation = WindowStartupLocation.Manual;
         ResizeMode = ResizeMode.NoResize;
         AllowsTransparency = true;
         Background = Brushes.Transparent;
@@ -38,15 +45,19 @@ public sealed class CrosshairPickerWindow : Window
         ShowInTaskbar = false;
         Cursor = Cursors.Cross;
 
-        _canvas = new Canvas();
+        _canvas = new Canvas
+        {
+            Width = _surfaceWidth,
+            Height = _surfaceHeight
+        };
         Content = _canvas;
 
         var background = new Image
         {
             Source = BitmapConversionHelper.ToBitmapSource(_screenshot),
             Stretch = Stretch.Fill,
-            Width = virtualBounds.Width,
-            Height = virtualBounds.Height,
+            Width = _surfaceWidth,
+            Height = _surfaceHeight,
             Opacity = 0.95
         };
 
@@ -54,8 +65,8 @@ public sealed class CrosshairPickerWindow : Window
 
         var darkOverlay = new ShapeRectangle
         {
-            Width = virtualBounds.Width,
-            Height = virtualBounds.Height,
+            Width = _surfaceWidth,
+            Height = _surfaceHeight,
             Fill = new SolidColorBrush(MediaColor.FromArgb(55, 10, 15, 25))
         };
         _canvas.Children.Add(darkOverlay);
@@ -65,7 +76,7 @@ public sealed class CrosshairPickerWindow : Window
             Stroke = Brushes.DeepSkyBlue,
             StrokeThickness = 1.2,
             X1 = 0,
-            X2 = virtualBounds.Width,
+            X2 = _surfaceWidth,
             Y1 = 0,
             Y2 = 0
         };
@@ -76,7 +87,7 @@ public sealed class CrosshairPickerWindow : Window
             X1 = 0,
             X2 = 0,
             Y1 = 0,
-            Y2 = virtualBounds.Height
+            Y2 = _surfaceHeight
         };
         _canvas.Children.Add(_horizontalLine);
         _canvas.Children.Add(_verticalLine);
@@ -114,8 +125,8 @@ public sealed class CrosshairPickerWindow : Window
     private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         var point = e.GetPosition(this);
-        var absoluteX = _virtualBounds.Left + (int)Math.Round(point.X);
-        var absoluteY = _virtualBounds.Top + (int)Math.Round(point.Y);
+        var absoluteX = _virtualBounds.Left + (int)Math.Round(OverlayDpiHelper.DipToPixelsX(point.X, _dpiScale));
+        var absoluteY = _virtualBounds.Top + (int)Math.Round(OverlayDpiHelper.DipToPixelsY(point.Y, _dpiScale));
         var safeX = Math.Clamp(absoluteX - _virtualBounds.Left, 0, _screenshot.Width - 1);
         var safeY = Math.Clamp(absoluteY - _virtualBounds.Top, 0, _screenshot.Height - 1);
         var color = _screenshot.GetPixel(safeX, safeY);
@@ -146,14 +157,14 @@ public sealed class CrosshairPickerWindow : Window
         _verticalLine.X1 = point.X;
         _verticalLine.X2 = point.X;
 
-        var absoluteX = _virtualBounds.Left + (int)Math.Round(point.X);
-        var absoluteY = _virtualBounds.Top + (int)Math.Round(point.Y);
+        var absoluteX = _virtualBounds.Left + (int)Math.Round(OverlayDpiHelper.DipToPixelsX(point.X, _dpiScale));
+        var absoluteY = _virtualBounds.Top + (int)Math.Round(OverlayDpiHelper.DipToPixelsY(point.Y, _dpiScale));
         var safeX = Math.Clamp(absoluteX - _virtualBounds.Left, 0, _screenshot.Width - 1);
         var safeY = Math.Clamp(absoluteY - _virtualBounds.Top, 0, _screenshot.Height - 1);
         var color = _screenshot.GetPixel(safeX, safeY);
 
         _tooltipText.Text = $"X:{absoluteX}  Y:{absoluteY}  色值 #{color.R:X2}{color.G:X2}{color.B:X2}";
-        Canvas.SetLeft(_tooltip, Math.Min(point.X + 18, Math.Max(0, ActualWidth - 220)));
-        Canvas.SetTop(_tooltip, Math.Min(point.Y + 18, Math.Max(0, ActualHeight - 48)));
+        Canvas.SetLeft(_tooltip, Math.Min(point.X + 18, Math.Max(0, _surfaceWidth - 220)));
+        Canvas.SetTop(_tooltip, Math.Min(point.Y + 18, Math.Max(0, _surfaceHeight - 48)));
     }
 }

@@ -26,7 +26,7 @@ public sealed class JsonProjectStorageService : IProjectStorageService
         }
 
         await using var stream = File.Create(filePath);
-        await JsonSerializer.SerializeAsync(stream, project, SerializerOptions, cancellationToken);
+        await JsonSerializer.SerializeAsync(stream, project, SerializerOptions, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<AutomationProject> LoadAsync(string filePath, CancellationToken cancellationToken)
@@ -34,7 +34,7 @@ public sealed class JsonProjectStorageService : IProjectStorageService
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
         await using var stream = File.OpenRead(filePath);
-        var project = await JsonSerializer.DeserializeAsync<AutomationProject>(stream, SerializerOptions, cancellationToken);
+        var project = await JsonSerializer.DeserializeAsync<AutomationProject>(stream, SerializerOptions, cancellationToken).ConfigureAwait(false);
 
         return project ?? new AutomationProject();
     }

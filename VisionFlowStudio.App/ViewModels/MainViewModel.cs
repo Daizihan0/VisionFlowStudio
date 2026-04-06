@@ -12,6 +12,7 @@ namespace VisionFlowStudio.App.ViewModels;
 public sealed class MainViewModel : ObservableObject
 {
     private readonly IProjectStorageService _projectStorageService;
+    private readonly INodeTemplateLibraryService _nodeTemplateLibraryService;
     private readonly IFlowExecutionEngine _previewExecutionEngine;
     private readonly IFlowExecutionEngine _liveExecutionEngine;
     private readonly ScreenCaptureService _screenCaptureService;
@@ -21,22 +22,39 @@ public sealed class MainViewModel : ObservableObject
     private readonly RelayCommand _stopExecutionCommand;
     private readonly RelayCommand _startRecordingCommand;
     private readonly RelayCommand _stopRecordingCommand;
+    private readonly RelayCommand _zoomOutCommand;
+    private readonly RelayCommand _zoomInCommand;
+    private readonly RelayCommand _resetZoomCommand;
+    private readonly RelayCommand _deleteSelectedNodeCommand;
+    private readonly RelayCommand _saveSelectedNodeAsTemplateCommand;
+    private readonly RelayCommand _insertNodeTemplateCommand;
+    private readonly RelayCommand _deleteNodeTemplateCommand;
+    private readonly RelayCommand _beginConnectionCommand;
+    private readonly RelayCommand _cancelConnectionCommand;
+    private readonly RelayCommand _deleteSelectedConnectionCommand;
     private AutomationProject _project = new();
+    private DesignerConnectionViewModel? _selectedConnection;
     private FlowNodeViewModel? _selectedNode;
+    private FlowNodeViewModel? _pendingConnectionSource;
     private FlowNodeViewModel? _recordingTargetNode;
     private CancellationTokenSource? _executionCancellationTokenSource;
     private bool _isExecuting;
     private string _executionMode = "设计模式";
     private string? _currentFilePath;
+    private double _zoomScale = 1.0;
+    private double _designerCanvasUserWidth = 2200d;
+    private double _designerCanvasUserHeight = 1400d;
 
     public MainViewModel(
         IProjectStorageService projectStorageService,
+        INodeTemplateLibraryService nodeTemplateLibraryService,
         IFlowExecutionEngine previewExecutionEngine,
         IFlowExecutionEngine liveExecutionEngine,
         ScreenCaptureService screenCaptureService,
         InputRecordingService inputRecordingService)
     {
         _projectStorageService = projectStorageService;
+        _nodeTemplateLibraryService = nodeTemplateLibraryService;
         _previewExecutionEngine = previewExecutionEngine;
         _liveExecutionEngine = liveExecutionEngine;
         _screenCaptureService = screenCaptureService;
@@ -47,6 +65,7 @@ public sealed class MainViewModel : ObservableObject
         Logs = [];
         AssetItems = [];
         ScheduleItems = [];
+        NodeTemplates = [];
 
         NewProjectCommand = new RelayCommand(CreateNewProject);
         SaveProjectCommand = new RelayCommand(async _ => await SaveProjectAsync());
@@ -65,14 +84,35 @@ public sealed class MainViewModel : ObservableObject
         _runPreviewCommand = new RelayCommand(async _ => await RunEngineAsync(_previewExecutionEngine, "预览执行中"), _ => !_isExecuting && !_inputRecordingService.IsRecording);
         _runLiveCommand = new RelayCommand(async _ => await RunEngineAsync(_liveExecutionEngine, "真实执行中"), _ => !_isExecuting && !_inputRecordingService.IsRecording);
         _stopExecutionCommand = new RelayCommand(HandleEmergencyStop, () => _isExecuting || _inputRecordingService.IsRecording);
+        _zoomOutCommand = new RelayCommand(_ => AdjustZoom(-0.1d));
+        _zoomInCommand = new RelayCommand(_ => AdjustZoom(0.1d));
+        _resetZoomCommand = new RelayCommand(_ => ZoomScale = 1.0d);
+        _deleteSelectedNodeCommand = new RelayCommand(_ => DeleteSelectedNode(), _ => SelectedNode is not null && !IsBusy && SelectedNode.Kind != FlowNodeKind.Start);
+        _saveSelectedNodeAsTemplateCommand = new RelayCommand(async _ => await SaveSelectedNodeAsTemplateAsync(), _ => SelectedNode is not null);
+        _insertNodeTemplateCommand = new RelayCommand(parameter => InsertNodeTemplate(parameter as ReusableNodeTemplate), parameter => parameter is ReusableNodeTemplate && !IsBusy);
+        _deleteNodeTemplateCommand = new RelayCommand(async parameter => await DeleteNodeTemplateAsync(parameter as ReusableNodeTemplate), parameter => parameter is ReusableNodeTemplate && !IsBusy);
+        _beginConnectionCommand = new RelayCommand(_ => BeginConnectionFromSelectedNode(), _ => SelectedNode is not null && !IsBusy);
+        _cancelConnectionCommand = new RelayCommand(_ => CancelConnectionMode(), _ => IsConnectionModeActive);
+        _deleteSelectedConnectionCommand = new RelayCommand(_ => DeleteSelectedConnection(), _ => SelectedConnection is not null && !IsBusy);
 
         StartRecordingCommand = _startRecordingCommand;
         StopRecordingCommand = _stopRecordingCommand;
         RunPreviewCommand = _runPreviewCommand;
         RunLiveCommand = _runLiveCommand;
         StopExecutionCommand = _stopExecutionCommand;
+        ZoomOutCommand = _zoomOutCommand;
+        ZoomInCommand = _zoomInCommand;
+        ResetZoomCommand = _resetZoomCommand;
+        DeleteSelectedNodeCommand = _deleteSelectedNodeCommand;
+        SaveSelectedNodeAsTemplateCommand = _saveSelectedNodeAsTemplateCommand;
+        InsertNodeTemplateCommand = _insertNodeTemplateCommand;
+        DeleteNodeTemplateCommand = _deleteNodeTemplateCommand;
+        BeginConnectionCommand = _beginConnectionCommand;
+        CancelConnectionCommand = _cancelConnectionCommand;
+        DeleteSelectedConnectionCommand = _deleteSelectedConnectionCommand;
 
         CreateNewProject();
+        _ = LoadNodeTemplatesAsync();
     }
 
     public ObservableCollection<FlowNodeViewModel> Nodes { get; }
@@ -84,6 +124,8 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<string> AssetItems { get; }
 
     public ObservableCollection<string> ScheduleItems { get; }
+
+    public ObservableCollection<ReusableNodeTemplate> NodeTemplates { get; }
 
     public ICommand NewProjectCommand { get; }
 
@@ -119,7 +161,44 @@ public sealed class MainViewModel : ObservableObject
 
     public ICommand StopExecutionCommand { get; }
 
+    public ICommand ZoomOutCommand { get; }
+
+    public ICommand ZoomInCommand { get; }
+
+    public ICommand ResetZoomCommand { get; }
+
+    public ICommand DeleteSelectedNodeCommand { get; }
+
+    public ICommand SaveSelectedNodeAsTemplateCommand { get; }
+
+    public ICommand InsertNodeTemplateCommand { get; }
+
+    public ICommand DeleteNodeTemplateCommand { get; }
+
+    public ICommand BeginConnectionCommand { get; }
+
+    public ICommand CancelConnectionCommand { get; }
+
+    public ICommand DeleteSelectedConnectionCommand { get; }
+
     public bool IsBusy => _isExecuting || _inputRecordingService.IsRecording;
+
+    public double ZoomScale
+    {
+        get => _zoomScale;
+        set
+        {
+            var clamped = Math.Clamp(value, 0.10d, 2.0d);
+            if (!SetProperty(ref _zoomScale, clamped))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(ZoomPercentText));
+        }
+    }
+
+    public string ZoomPercentText => $"{Math.Round(ZoomScale * 100)}%";
 
     public string ProjectName
     {
@@ -155,11 +234,78 @@ public sealed class MainViewModel : ObservableObject
     public string HeaderSubtitle =>
         $"{NodeSummaryText} · {(_currentFilePath is null ? "未保存工程" : _currentFilePath)}";
 
-    public string NodeSummaryText => $"{Nodes.Count} 个节点 · {Connections.Count} 条连线";
+    public string NodeSummaryText
+    {
+        get
+        {
+            var disabledCount = Nodes.Count(node => node.IsTemporarilyDisabled);
+            return disabledCount == 0
+                ? $"{Nodes.Count} 个节点 · {Connections.Count} 条连线"
+                : $"{Nodes.Count} 个节点 · {Connections.Count} 条连线 · {disabledCount} 个已停用";
+        }
+    }
 
     public string LogSummaryText => $"共 {Logs.Count} 条记录";
 
     public string RunStateText => _executionMode;
+
+    public double DesignerCanvasWidth =>
+        Math.Max(_designerCanvasUserWidth, Nodes.Count == 0 ? 2200d : Nodes.Max(node => node.X + node.Width) + 420d);
+
+    public double DesignerCanvasHeight =>
+        Math.Max(_designerCanvasUserHeight, Nodes.Count == 0 ? 1400d : Nodes.Max(node => node.Y + node.Height) + 320d);
+
+    public string NodeTemplateSummaryText =>
+        NodeTemplates.Count == 0 ? "还没有保存任何复用节点" : $"{NodeTemplates.Count} 个可复用节点模板";
+
+    public bool IsConnectionModeActive => _pendingConnectionSource is not null;
+
+    public string ConnectionModeText =>
+        _pendingConnectionSource is null
+            ? "未开始手动连线"
+            : $"连线中：{_pendingConnectionSource.Title} -> 请点击目标节点";
+
+    public string SelectedNodeGuideTitle =>
+        SelectedNode is null ? "参数说明" : $"{SelectedNode.DisplayKind}如何配置";
+
+    public string SelectedNodeGuideText =>
+        SelectedNode?.ConfigurationGuide ?? "选中节点后，这里会给出该节点的用途、关键参数和推荐配置方式。";
+
+    public string SelectedNodeExampleText =>
+        SelectedNode?.ConfigurationExample ?? "示例会按 key=value 格式显示，可直接参考填写到上面的参数编辑框。";
+
+    public string SelectedNodeParameterDefinitionsText =>
+        SelectedNode?.ParameterDefinitionsText ?? "选中节点后，这里会逐项解释每个参数名是什么意思、什么时候要填、可以填什么值。";
+
+    public string SelectedNodeDisableHint =>
+        "勾选“临时停用”后，运行时会跳过这个节点；如果它是某个分支入口，程序也不会再走入该分支。";
+
+    public DesignerConnectionViewModel? SelectedConnection
+    {
+        get => _selectedConnection;
+        private set
+        {
+            if (_selectedConnection == value)
+            {
+                return;
+            }
+
+            if (_selectedConnection is not null)
+            {
+                _selectedConnection.IsSelected = false;
+            }
+
+            _selectedConnection = value;
+
+            if (_selectedConnection is not null)
+            {
+                _selectedConnection.IsSelected = true;
+            }
+
+            OnPropertyChanged();
+            RaiseCommandStates();
+        }
+    }
 
     public FlowNodeViewModel? SelectedNode
     {
@@ -184,6 +330,10 @@ public sealed class MainViewModel : ObservableObject
             }
 
             OnPropertyChanged();
+            OnPropertyChanged(nameof(SelectedNodeGuideTitle));
+            OnPropertyChanged(nameof(SelectedNodeGuideText));
+            OnPropertyChanged(nameof(SelectedNodeExampleText));
+            OnPropertyChanged(nameof(SelectedNodeParameterDefinitionsText));
             RaiseCommandStates();
         }
     }
@@ -204,6 +354,78 @@ public sealed class MainViewModel : ObservableObject
         }
 
         await Task.CompletedTask;
+    }
+
+    public void AdjustZoom(double delta) => ZoomScale += delta;
+
+    public void ResizeDesignerCanvas(double? width, double? height)
+    {
+        if (width is not null)
+        {
+            _designerCanvasUserWidth = Math.Max(2200d, width.Value);
+        }
+
+        if (height is not null)
+        {
+            _designerCanvasUserHeight = Math.Max(1400d, height.Value);
+        }
+
+        OnPropertyChanged(nameof(DesignerCanvasWidth));
+        OnPropertyChanged(nameof(DesignerCanvasHeight));
+    }
+
+    public bool TryHandleNodeClick(FlowNodeViewModel clickedNode)
+    {
+        SelectedConnection = null;
+        SelectedNode = clickedNode;
+
+        if (!IsConnectionModeActive)
+        {
+            return false;
+        }
+
+        if (_pendingConnectionSource is null)
+        {
+            _pendingConnectionSource = clickedNode;
+            RefreshConnectionModeState();
+            return true;
+        }
+
+        if (_pendingConnectionSource.Id == clickedNode.Id)
+        {
+            Log("警告", "连线目标不能是当前源节点。", clickedNode.Id);
+            return true;
+        }
+
+        var connectorKind = ResolveManualConnectorKind(_pendingConnectionSource);
+        if (connectorKind is null)
+        {
+            Log("警告", $"节点“{_pendingConnectionSource.Title}”的可用输出已经连满了。", _pendingConnectionSource.Id);
+            return true;
+        }
+
+        var label = connectorKind switch
+        {
+            FlowConnectorKind.True => "满足",
+            FlowConnectorKind.False => "否则",
+            _ => string.Empty
+        };
+
+        if (!CanCreateConnection(_pendingConnectionSource, clickedNode, connectorKind.Value, out var warning))
+        {
+            Log("警告", warning, _pendingConnectionSource.Id);
+            return true;
+        }
+
+        AddConnection(_pendingConnectionSource, clickedNode, connectorKind.Value, label);
+        Log("成功", $"已连接：{_pendingConnectionSource.Title} -> {clickedNode.Title}", _pendingConnectionSource.Id);
+        CancelConnectionMode();
+        return true;
+    }
+
+    public void SelectConnection(DesignerConnectionViewModel connectionViewModel)
+    {
+        SelectedConnection = connectionViewModel;
     }
 
     private void CreateNewProject()
@@ -227,11 +449,17 @@ public sealed class MainViewModel : ObservableObject
             Settings = CreateDefaultSettings(kind)
         };
 
+        AddNodeToProject(node, autoConnectFromSelection: true, $"已添加节点：{node.Title}");
+    }
+
+    private void AddNodeToProject(FlowNode node, bool autoConnectFromSelection, string successLog)
+    {
         _project.Graph.Nodes.Add(node);
         var nodeViewModel = new FlowNodeViewModel(node);
+        RegisterNodeViewModel(nodeViewModel);
         Nodes.Add(nodeViewModel);
 
-        if (SelectedNode is not null && SelectedNode.Id != nodeViewModel.Id)
+        if (autoConnectFromSelection && SelectedNode is not null && SelectedNode.Id != nodeViewModel.Id)
         {
             var connectorKind = DetermineAutoConnector(SelectedNode);
             var label = connectorKind switch
@@ -247,7 +475,7 @@ public sealed class MainViewModel : ObservableObject
         SelectedNode = nodeViewModel;
         RebuildAssetItems();
         RefreshDashboard();
-        Log("信息", $"已添加节点：{node.Title}");
+        Log("信息", successLog, node.Id);
     }
 
     private async Task CaptureImageForSelectedNodeAsync()
@@ -396,6 +624,9 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
+        var shouldHideMainWindow = ReferenceEquals(engine, _liveExecutionEngine);
+        WindowState? previousWindowState = null;
+
         try
         {
             _isExecuting = true;
@@ -403,6 +634,22 @@ public sealed class MainViewModel : ObservableObject
             _executionCancellationTokenSource = new CancellationTokenSource();
             ResetNodeStatuses();
             RefreshDashboard();
+
+            if (shouldHideMainWindow)
+            {
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    if (Application.Current.MainWindow is not Window window)
+                    {
+                        return;
+                    }
+
+                    previousWindowState = window.WindowState;
+                    window.WindowState = WindowState.Minimized;
+                });
+
+                await Task.Delay(220, _executionCancellationTokenSource.Token);
+            }
 
             await engine.ExecutePreviewAsync(
                 _project,
@@ -420,6 +667,20 @@ public sealed class MainViewModel : ObservableObject
         }
         finally
         {
+            if (shouldHideMainWindow)
+            {
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    if (Application.Current.MainWindow is not Window window)
+                    {
+                        return;
+                    }
+
+                    window.WindowState = previousWindowState ?? WindowState.Normal;
+                    window.Activate();
+                });
+            }
+
             _isExecuting = false;
             _executionMode = "设计模式";
             _executionCancellationTokenSource?.Dispose();
@@ -494,10 +755,195 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private async Task SaveSelectedNodeAsTemplateAsync()
+    {
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var existingTemplate = NodeTemplates.FirstOrDefault(template =>
+                string.Equals(template.Name, SelectedNode.Title, StringComparison.OrdinalIgnoreCase));
+
+            var template = new ReusableNodeTemplate
+            {
+                Id = existingTemplate?.Id ?? Guid.NewGuid(),
+                Name = SelectedNode.Title,
+                Description = string.IsNullOrWhiteSpace(SelectedNode.Description)
+                    ? $"{SelectedNode.DisplayKind}模板"
+                    : SelectedNode.Description,
+                SavedAtUtc = DateTime.UtcNow,
+                Node = CloneNode(SelectedNode.Model, resetIdentity: false, positionOverride: new ProjectPoint())
+            };
+
+            template.Node.IsTemporarilyDisabled = false;
+
+            await _nodeTemplateLibraryService.SaveAsync(template, CancellationToken.None);
+            await LoadNodeTemplatesAsync();
+            Log("成功", existingTemplate is null
+                ? $"已把节点“{SelectedNode.Title}”保存到复用节点库。"
+                : $"已更新复用节点“{SelectedNode.Title}”。", SelectedNode.Id);
+        }
+        catch (Exception ex)
+        {
+            Log("错误", $"保存复用节点失败：{ex.Message}", SelectedNode.Id);
+        }
+    }
+
+    private void InsertNodeTemplate(ReusableNodeTemplate? template)
+    {
+        if (template is null)
+        {
+            return;
+        }
+
+        var node = CloneNode(template.Node, resetIdentity: true, positionOverride: CalculateNewNodePosition());
+        node.Title = CreateUniqueNodeTitle(template.Name);
+        node.Description = string.IsNullOrWhiteSpace(template.Description) ? node.Description : template.Description;
+        AddNodeToProject(node, autoConnectFromSelection: true, $"已从模板插入节点：{node.Title}");
+    }
+
+    private async Task LoadNodeTemplatesAsync()
+    {
+        try
+        {
+            var templates = await _nodeTemplateLibraryService.LoadAllAsync(CancellationToken.None);
+            NodeTemplates.Clear();
+
+            foreach (var template in templates.OrderByDescending(item => item.SavedAtUtc))
+            {
+                NodeTemplates.Add(template);
+            }
+
+            OnPropertyChanged(nameof(NodeTemplateSummaryText));
+            RaiseCommandStates();
+        }
+        catch (Exception ex)
+        {
+            Log("错误", $"加载复用节点库失败：{ex.Message}");
+        }
+    }
+
+    private async Task DeleteNodeTemplateAsync(ReusableNodeTemplate? template)
+    {
+        if (template is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _nodeTemplateLibraryService.DeleteAsync(template.Id, CancellationToken.None);
+            await LoadNodeTemplatesAsync();
+            Log("成功", $"已删除复用节点“{template.Name}”。");
+        }
+        catch (Exception ex)
+        {
+            Log("错误", $"删除复用节点失败：{ex.Message}");
+        }
+    }
+
+    private void BeginConnectionFromSelectedNode()
+    {
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        _pendingConnectionSource = SelectedNode;
+        RefreshConnectionModeState();
+        Log("信息", $"已进入手动连线模式：请点击目标节点，源节点为“{SelectedNode.Title}”。", SelectedNode.Id);
+    }
+
+    private void CancelConnectionMode()
+    {
+        if (_pendingConnectionSource is null)
+        {
+            return;
+        }
+
+        _pendingConnectionSource = null;
+        RefreshConnectionModeState();
+    }
+
+    private void DeleteSelectedConnection()
+    {
+        if (SelectedConnection is null)
+        {
+            return;
+        }
+
+        var connectionToDelete = SelectedConnection;
+        _project.Graph.Connections.Remove(connectionToDelete.Model);
+        Connections.Remove(connectionToDelete);
+        SelectedConnection = null;
+        OnPropertyChanged(nameof(NodeSummaryText));
+        OnPropertyChanged(nameof(HeaderSubtitle));
+        Log("成功", $"已删除连线：{connectionToDelete.SourceNode.Title} -> {connectionToDelete.TargetNode.Title}");
+    }
+
+    private void DeleteSelectedNode()
+    {
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        var nodeToDelete = SelectedNode;
+        if (nodeToDelete.Kind == FlowNodeKind.Start)
+        {
+            Log("警告", "开始节点不能删除。", nodeToDelete.Id);
+            return;
+        }
+
+        var removedConnections = _project.Graph.Connections
+            .Where(connection => connection.SourceNodeId == nodeToDelete.Id || connection.TargetNodeId == nodeToDelete.Id)
+            .ToList();
+
+        foreach (var connection in removedConnections)
+        {
+            _project.Graph.Connections.Remove(connection);
+        }
+
+        var connectionViewModels = Connections
+            .Where(connection => connection.Model.SourceNodeId == nodeToDelete.Id || connection.Model.TargetNodeId == nodeToDelete.Id)
+            .ToList();
+
+        foreach (var connection in connectionViewModels)
+        {
+            Connections.Remove(connection);
+        }
+
+        _project.Graph.Nodes.Remove(nodeToDelete.Model);
+        Nodes.Remove(nodeToDelete);
+
+        SelectedConnection = null;
+
+        if (_pendingConnectionSource?.Id == nodeToDelete.Id)
+        {
+            _pendingConnectionSource = null;
+            RefreshConnectionModeState();
+        }
+
+        if (_recordingTargetNode?.Id == nodeToDelete.Id)
+        {
+            _recordingTargetNode = null;
+        }
+
+        SelectedNode = Nodes.FirstOrDefault();
+        RebuildAssetItems();
+        RefreshDashboard();
+        Log("成功", $"已删除节点“{nodeToDelete.Title}”。", nodeToDelete.Id);
+    }
+
     private void ApplyProject(AutomationProject project)
     {
         _project = project;
+        _pendingConnectionSource = null;
         _recordingTargetNode = null;
+        SelectedConnection = null;
         Nodes.Clear();
         Connections.Clear();
         Logs.Clear();
@@ -506,7 +952,9 @@ public sealed class MainViewModel : ObservableObject
 
         foreach (var node in _project.Graph.Nodes)
         {
-            Nodes.Add(new FlowNodeViewModel(node));
+            var nodeViewModel = new FlowNodeViewModel(node);
+            RegisterNodeViewModel(nodeViewModel);
+            Nodes.Add(nodeViewModel);
         }
 
         foreach (var connection in _project.Graph.Connections)
@@ -530,6 +978,7 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(ProjectName));
         OnPropertyChanged(nameof(ProjectDescription));
         SelectedNode = Nodes.FirstOrDefault();
+        RefreshConnectionModeState();
         RefreshDashboard();
     }
 
@@ -567,7 +1016,8 @@ public sealed class MainViewModel : ObservableObject
         }
 
         assets.Add("手动定位：可把屏幕点位写入动作/条件/等待节点");
-        assets.Add("剪贴板贴图：把截图直接粘到当前节点作为模板");
+        assets.Add("复用节点：支持把当前节点保存到模板库并跨项目插入");
+        assets.Add("节点停用：停用后运行时会跳过该节点及其分支入口");
         assets.Add("全局热键：F9 停止录制，F10 紧急停止执行");
 
         foreach (var item in assets)
@@ -587,8 +1037,40 @@ public sealed class MainViewModel : ObservableObject
         return SelectedNode!;
     }
 
-    private void AddConnection(FlowNodeViewModel source, FlowNodeViewModel target, FlowConnectorKind connectorKind, string label)
+    private FlowConnectorKind? ResolveManualConnectorKind(FlowNodeViewModel source)
     {
+        if (source.Kind != FlowNodeKind.Condition)
+        {
+            return FlowConnectorKind.Next;
+        }
+
+        var existingConnections = _project.Graph.Connections
+            .Where(connection => connection.SourceNodeId == source.Id)
+            .ToList();
+
+        if (existingConnections.All(connection => connection.ConnectorKind != FlowConnectorKind.True))
+        {
+            return FlowConnectorKind.True;
+        }
+
+        if (existingConnections.All(connection => connection.ConnectorKind != FlowConnectorKind.False))
+        {
+            return FlowConnectorKind.False;
+        }
+
+        return null;
+    }
+
+    private bool CanCreateConnection(FlowNodeViewModel source, FlowNodeViewModel target, FlowConnectorKind connectorKind, out string message)
+    {
+        message = string.Empty;
+
+        if (source.Id == target.Id)
+        {
+            message = "节点不能连到自己。";
+            return false;
+        }
+
         var existingConnections = _project.Graph.Connections
             .Where(connection => connection.SourceNodeId == source.Id)
             .ToList();
@@ -596,11 +1078,32 @@ public sealed class MainViewModel : ObservableObject
         if (connectorKind is FlowConnectorKind.True or FlowConnectorKind.False
             && existingConnections.Any(connection => connection.ConnectorKind == connectorKind))
         {
-            return;
+            message = connectorKind == FlowConnectorKind.True
+                ? "这个条件节点的 TRUE 分支已经连接过了。"
+                : "这个条件节点的 FALSE 分支已经连接过了。";
+            return false;
         }
 
         if (connectorKind == FlowConnectorKind.Next
             && existingConnections.Any(connection => connection.ConnectorKind == FlowConnectorKind.Next && connection.TargetNodeId == target.Id))
+        {
+            message = "这两个节点之间已经有同样的连线了。";
+            return false;
+        }
+
+        if (source.Kind != FlowNodeKind.Condition
+            && existingConnections.Any(connection => connection.ConnectorKind is FlowConnectorKind.Next or FlowConnectorKind.Success))
+        {
+            message = "普通节点当前只允许一条主输出连线。";
+            return false;
+        }
+
+        return true;
+    }
+
+    private void AddConnection(FlowNodeViewModel source, FlowNodeViewModel target, FlowConnectorKind connectorKind, string label)
+    {
+        if (!CanCreateConnection(source, target, connectorKind, out _))
         {
             return;
         }
@@ -615,6 +1118,8 @@ public sealed class MainViewModel : ObservableObject
 
         _project.Graph.Connections.Add(connection);
         Connections.Add(new DesignerConnectionViewModel(connection, source, target));
+        OnPropertyChanged(nameof(NodeSummaryText));
+        OnPropertyChanged(nameof(HeaderSubtitle));
     }
 
     private void UpdateNodeStatus(Guid nodeId, NodeStatus status)
@@ -699,6 +1204,26 @@ public sealed class MainViewModel : ObservableObject
         };
     }
 
+    private string CreateUniqueNodeTitle(string baseTitle)
+    {
+        if (Nodes.All(node => !string.Equals(node.Title, baseTitle, StringComparison.OrdinalIgnoreCase)))
+        {
+            return baseTitle;
+        }
+
+        var index = 2;
+        while (true)
+        {
+            var candidate = $"{baseTitle} {index}";
+            if (Nodes.All(node => !string.Equals(node.Title, candidate, StringComparison.OrdinalIgnoreCase)))
+            {
+                return candidate;
+            }
+
+            index++;
+        }
+    }
+
     private static string CreateNodeDescription(FlowNodeKind kind) =>
         kind switch
         {
@@ -718,7 +1243,9 @@ public sealed class MainViewModel : ObservableObject
             {
                 ["ActionType"] = "LeftClick",
                 ["TargetMode"] = "AnchorCenter",
-                ["ClickOffset"] = "0,0"
+                ["ClickOffset"] = "0,0",
+                ["BeforeActionDelayMs"] = "0",
+                ["AfterActionDelayMs"] = "0"
             },
             FlowNodeKind.Vision => new Dictionary<string, string>
             {
@@ -793,7 +1320,9 @@ public sealed class MainViewModel : ObservableObject
             {
                 ["ActionType"] = "LeftClick",
                 ["TargetMode"] = "AnchorCenter",
-                ["ClickOffset"] = "0,0"
+                ["ClickOffset"] = "0,0",
+                ["BeforeActionDelayMs"] = "0",
+                ["AfterActionDelayMs"] = "300"
             }
         };
 
@@ -884,6 +1413,38 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HeaderSubtitle));
         OnPropertyChanged(nameof(RunStateText));
         OnPropertyChanged(nameof(IsBusy));
+        OnPropertyChanged(nameof(NodeTemplateSummaryText));
+        OnPropertyChanged(nameof(SelectedNodeDisableHint));
+        OnPropertyChanged(nameof(DesignerCanvasWidth));
+        OnPropertyChanged(nameof(DesignerCanvasHeight));
+        RaiseCommandStates();
+    }
+
+    private void RegisterNodeViewModel(FlowNodeViewModel nodeViewModel)
+    {
+        nodeViewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is nameof(FlowNodeViewModel.IsTemporarilyDisabled)
+                or nameof(FlowNodeViewModel.Title)
+                or nameof(FlowNodeViewModel.Description))
+            {
+                OnPropertyChanged(nameof(NodeSummaryText));
+                OnPropertyChanged(nameof(HeaderSubtitle));
+            }
+
+            if (args.PropertyName is nameof(FlowNodeViewModel.X)
+                or nameof(FlowNodeViewModel.Y))
+            {
+                OnPropertyChanged(nameof(DesignerCanvasWidth));
+                OnPropertyChanged(nameof(DesignerCanvasHeight));
+            }
+        };
+    }
+
+    private void RefreshConnectionModeState()
+    {
+        OnPropertyChanged(nameof(IsConnectionModeActive));
+        OnPropertyChanged(nameof(ConnectionModeText));
         RaiseCommandStates();
     }
 
@@ -894,8 +1455,46 @@ public sealed class MainViewModel : ObservableObject
         _stopExecutionCommand.RaiseCanExecuteChanged();
         _startRecordingCommand.RaiseCanExecuteChanged();
         _stopRecordingCommand.RaiseCanExecuteChanged();
+        _deleteSelectedNodeCommand.RaiseCanExecuteChanged();
+        _saveSelectedNodeAsTemplateCommand.RaiseCanExecuteChanged();
+        _insertNodeTemplateCommand.RaiseCanExecuteChanged();
+        _deleteNodeTemplateCommand.RaiseCanExecuteChanged();
+        _beginConnectionCommand.RaiseCanExecuteChanged();
+        _cancelConnectionCommand.RaiseCanExecuteChanged();
+        _deleteSelectedConnectionCommand.RaiseCanExecuteChanged();
         ((RelayCommand)CaptureImageForNodeCommand).RaiseCanExecuteChanged();
         ((RelayCommand)PasteImageForNodeCommand).RaiseCanExecuteChanged();
         ((RelayCommand)PickPointForNodeCommand).RaiseCanExecuteChanged();
+    }
+
+    private static FlowNode CloneNode(FlowNode source, bool resetIdentity, ProjectPoint? positionOverride)
+    {
+        return new FlowNode
+        {
+            Id = resetIdentity ? Guid.NewGuid() : source.Id,
+            Kind = source.Kind,
+            Title = source.Title,
+            Description = source.Description,
+            Position = positionOverride ?? new ProjectPoint { X = source.Position.X, Y = source.Position.Y },
+            TimeoutMs = source.TimeoutMs,
+            RetryLimit = source.RetryLimit,
+            Settings = source.Settings.ToDictionary(pair => pair.Key, pair => pair.Value),
+            AssetPayloadBase64 = source.AssetPayloadBase64,
+            AssetFileName = source.AssetFileName,
+            RecordedEvents =
+            [
+                .. source.RecordedEvents.Select(item => new RecordedInputEvent
+                {
+                    EventType = item.EventType,
+                    DelayMs = item.DelayMs,
+                    X = item.X,
+                    Y = item.Y,
+                    MouseButton = item.MouseButton,
+                    WheelDelta = item.WheelDelta,
+                    VirtualKey = item.VirtualKey
+                })
+            ],
+            IsTemporarilyDisabled = source.IsTemporarilyDisabled
+        };
     }
 }
