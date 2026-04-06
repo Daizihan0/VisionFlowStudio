@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
@@ -32,6 +33,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly RelayCommand _beginConnectionCommand;
     private readonly RelayCommand _cancelConnectionCommand;
     private readonly RelayCommand _deleteSelectedConnectionCommand;
+    private readonly RelayCommand _exportScriptCommand;
     private AutomationProject _project = new();
     private DesignerConnectionViewModel? _selectedConnection;
     private FlowNodeViewModel? _selectedNode;
@@ -94,6 +96,7 @@ public sealed class MainViewModel : ObservableObject
         _beginConnectionCommand = new RelayCommand(_ => BeginConnectionFromSelectedNode(), _ => SelectedNode is not null && !IsBusy);
         _cancelConnectionCommand = new RelayCommand(_ => CancelConnectionMode(), _ => IsConnectionModeActive);
         _deleteSelectedConnectionCommand = new RelayCommand(_ => DeleteSelectedConnection(), _ => SelectedConnection is not null && !IsBusy);
+        _exportScriptCommand = new RelayCommand(async _ => await ExportScriptAsync(), _ => CanExportScript());
 
         StartRecordingCommand = _startRecordingCommand;
         StopRecordingCommand = _stopRecordingCommand;
@@ -110,6 +113,7 @@ public sealed class MainViewModel : ObservableObject
         BeginConnectionCommand = _beginConnectionCommand;
         CancelConnectionCommand = _cancelConnectionCommand;
         DeleteSelectedConnectionCommand = _deleteSelectedConnectionCommand;
+        ExportScriptCommand = _exportScriptCommand;
 
         CreateNewProject();
         _ = LoadNodeTemplatesAsync();
@@ -180,6 +184,8 @@ public sealed class MainViewModel : ObservableObject
     public ICommand CancelConnectionCommand { get; }
 
     public ICommand DeleteSelectedConnectionCommand { get; }
+
+    public ICommand ExportScriptCommand { get; }
 
     public bool IsBusy => _isExecuting || _inputRecordingService.IsRecording;
 
@@ -280,6 +286,8 @@ public sealed class MainViewModel : ObservableObject
     public string SelectedNodeDisableHint =>
         "勾选“临时停用”后，运行时会跳过这个节点；如果它是某个分支入口，程序也不会再走入该分支。";
 
+    public bool HasSelectedNode => SelectedNode is not null;
+
     public DesignerConnectionViewModel? SelectedConnection
     {
         get => _selectedConnection;
@@ -334,6 +342,7 @@ public sealed class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(SelectedNodeGuideText));
             OnPropertyChanged(nameof(SelectedNodeExampleText));
             OnPropertyChanged(nameof(SelectedNodeParameterDefinitionsText));
+            OnPropertyChanged(nameof(HasSelectedNode));
             RaiseCommandStates();
         }
     }
@@ -426,6 +435,12 @@ public sealed class MainViewModel : ObservableObject
     public void SelectConnection(DesignerConnectionViewModel connectionViewModel)
     {
         SelectedConnection = connectionViewModel;
+    }
+
+    public void ClearSelection()
+    {
+        SelectedConnection = null;
+        SelectedNode = null;
     }
 
     private void CreateNewProject()
@@ -882,6 +897,47 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(NodeSummaryText));
         OnPropertyChanged(nameof(HeaderSubtitle));
         Log("成功", $"已删除连线：{connectionToDelete.SourceNode.Title} -> {connectionToDelete.TargetNode.Title}");
+    }
+
+    private bool CanExportScript()
+    {
+        return !string.IsNullOrWhiteSpace(_currentFilePath) && !IsBusy;
+    }
+
+    private async Task ExportScriptAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_currentFilePath))
+        {
+            Log("警告", "请先保存项目后再导出脚本。");
+            return;
+        }
+
+        try
+        {
+            var projectFileName = Path.GetFileName(_currentFilePath);
+            var suggestedScriptName = ScriptExporter.GetSuggestedFileName(ProjectName);
+
+            var dialog = new SaveFileDialog
+            {
+                Filter = "批处理脚本 (*.bat)|*.bat",
+                FileName = suggestedScriptName,
+                InitialDirectory = Path.GetDirectoryName(_currentFilePath)
+            };
+
+            if (dialog.ShowDialog() != true)
+            {
+                return;
+            }
+
+            var scriptContent = ScriptExporter.GenerateBatScript(projectFileName);
+            await File.WriteAllTextAsync(dialog.FileName, scriptContent, System.Text.Encoding.UTF8);
+
+            Log("成功", $"脚本已导出到：{dialog.FileName}");
+        }
+        catch (Exception ex)
+        {
+            Log("错误", $"导出脚本失败：{ex.Message}");
+        }
     }
 
     private void DeleteSelectedNode()
@@ -1462,6 +1518,7 @@ public sealed class MainViewModel : ObservableObject
         _beginConnectionCommand.RaiseCanExecuteChanged();
         _cancelConnectionCommand.RaiseCanExecuteChanged();
         _deleteSelectedConnectionCommand.RaiseCanExecuteChanged();
+        _exportScriptCommand.RaiseCanExecuteChanged();
         ((RelayCommand)CaptureImageForNodeCommand).RaiseCanExecuteChanged();
         ((RelayCommand)PasteImageForNodeCommand).RaiseCanExecuteChanged();
         ((RelayCommand)PickPointForNodeCommand).RaiseCanExecuteChanged();
