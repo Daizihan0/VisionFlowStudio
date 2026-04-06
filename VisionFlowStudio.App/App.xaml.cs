@@ -28,6 +28,10 @@ public partial class App : Application
 
         if (options.IsExecuteMode && !string.IsNullOrWhiteSpace(options.ProjectFilePath))
         {
+            if (!options.IsSilent)
+            {
+                ShowMainWindow();  // Show window for non-silent execution
+            }
             await ExecuteProjectAsync(options);
             return;
         }
