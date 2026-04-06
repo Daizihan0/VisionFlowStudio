@@ -20,9 +20,9 @@ public static class ScriptExporter
 
         return $@"@echo off
 chcp 65001 >nul
-:: VisionFlow Studio 自动化脚本
-:: 生成时间: {generatedAt}
-:: 项目文件: {projectFileName}
+REM VisionFlow Studio 自动化脚本
+REM 生成时间: {generatedAt}
+REM 项目文件: {projectFileName}
 
 set ""APP_PATH={appPath}""
 set ""PROJECT_PATH=%~dp0{projectFileName}""
