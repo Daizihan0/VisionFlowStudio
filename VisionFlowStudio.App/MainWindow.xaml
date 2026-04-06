@@ -230,6 +230,7 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
     </Window.Resources>
 
     <Grid Margin="16">
@@ -257,6 +258,7 @@
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding NewProjectCommand}" Content="新建项目" />
                     <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding SaveProjectCommand}" Content="保存工程" />
+                    <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding ExportScriptCommand}" Content="导出脚本" />
                     <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding LoadProjectCommand}" Content="打开工程" />
                     <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding CaptureImageForNodeCommand}" Content="截图定位" />
                     <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding PasteImageForNodeCommand}" Content="粘贴图片" />
@@ -292,12 +294,12 @@
                         </Border>
 
                         <TextBlock Margin="0,18,0,10" FontSize="15" FontWeight="SemiBold" Text="节点库" />
-                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddVisionNodeCommand}" Content="🖼 截图锚点节点" />
-                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddActionNodeCommand}" Content="🖱 动作节点" />
-                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddWaitNodeCommand}" Content="⏱ 等待节点" />
-                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddConditionNodeCommand}" Content="🔀 条件分支节点" />
-                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddSubFlowNodeCommand}" Content="🎞 录制片段节点" />
-                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddEndNodeCommand}" Content="🏁 结束节点" />
+                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddVisionNodeCommand}" Content="截图节点" />
+                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddActionNodeCommand}" Content="动作节点" />
+                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddWaitNodeCommand}" Content="等待节点" />
+                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddConditionNodeCommand}" Content="条件分支节点" />
+                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddSubFlowNodeCommand}" Content="录制片段节点" />
+                        <Button Style="{StaticResource NodeButtonStyle}" Command="{Binding AddEndNodeCommand}" Content="结束节点" />
 
                         <TextBlock Margin="0,18,0,6" FontSize="15" FontWeight="SemiBold" Text="复用节点库" />
                         <TextBlock Foreground="#94A3B8" Text="{Binding NodeTemplateSummaryText}" TextWrapping="Wrap" />
@@ -331,27 +333,6 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <TextBlock Margin="0,18,0,10" FontSize="15" FontWeight="SemiBold" Text="资源概览" />
-                        <ItemsControl ItemsSource="{Binding AssetItems}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Margin="0,0,0,8" Padding="10" Background="#131E31" CornerRadius="12">
-                                        <TextBlock Text="{Binding}" TextWrapping="Wrap" />
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                        <TextBlock Margin="0,18,0,10" FontSize="15" FontWeight="SemiBold" Text="定时执行" />
-                        <ItemsControl ItemsSource="{Binding ScheduleItems}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Margin="0,0,0,8" Padding="10" Background="#131E31" CornerRadius="12">
-                                        <TextBlock Text="{Binding}" TextWrapping="Wrap" />
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
@@ -382,15 +363,13 @@
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding ZoomOutCommand}" Content="缩小" />
                                 <Border Margin="0,0,8,0" Padding="10,4" Background="#172033" CornerRadius="999" VerticalAlignment="Center">
                                     <TextBlock Foreground="#F8FAFC" Text="{Binding ZoomPercentText}" />
                                 </Border>
-                                <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding ResetZoomCommand}" Content="100%" />
-                                <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding ZoomInCommand}" Content="放大" />
                                 <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding BeginConnectionCommand}" Content="开始连线" />
                                 <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding CancelConnectionCommand}" Content="取消连线" />
                                 <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding DeleteSelectedConnectionCommand}" Content="删除连线" />
+                                <Button Style="{StaticResource ToolbarButtonStyle}" Click="EnterCanvasFullscreenButton_Click" Content="全屏画布" />
                                 <Border Margin="0,0,8,0" Padding="10,4" Background="#172033" CornerRadius="999" VerticalAlignment="Center">
                                     <TextBlock Foreground="#F8FAFC" Text="{Binding ConnectionModeText}" />
                                 </Border>
@@ -406,8 +385,8 @@
 
                     <ScrollViewer Grid.Row="1"
                                   x:Name="DesignerScrollViewer"
-                                  HorizontalScrollBarVisibility="Auto"
-                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Hidden"
+                                  VerticalScrollBarVisibility="Hidden"
                                   Background="#0C1423"
                                   PreviewMouseWheel="DesignerScrollViewer_PreviewMouseWheel">
                         <Grid Width="{Binding DesignerCanvasWidth}"
@@ -422,7 +401,10 @@
                                     Width="{Binding DesignerCanvasWidth}"
                                     Height="{Binding DesignerCanvasHeight}"
                                     Background="#0C1423"
-                                    ClipToBounds="False">
+                                    ClipToBounds="False"
+                                    MouseLeftButtonDown="DesignerCanvas_MouseLeftButtonDown"
+                                    MouseLeftButtonUp="DesignerCanvas_MouseLeftButtonUp"
+                                    MouseMove="DesignerCanvas_MouseMove">
                             <ItemsControl ItemsSource="{Binding Connections}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
@@ -483,15 +465,10 @@
                                                 MouseLeftButtonUp="Node_MouseLeftButtonUp"
                                                 MouseMove="Node_MouseMove">
                                             <Grid>
-                                                <Rectangle Height="6"
-                                                           RadiusX="3"
-                                                           RadiusY="3"
-                                                           VerticalAlignment="Top"
-                                                           Fill="{Binding AccentBrush}" />
                                                 <Grid Margin="14,14,14,12">
                                                     <Grid.RowDefinitions>
                                                         <RowDefinition Height="Auto" />
-                                                        <RowDefinition Height="*" />
+                                                        <RowDefinition Height="Auto" />
                                                         <RowDefinition Height="Auto" />
                                                     </Grid.RowDefinitions>
 
@@ -509,11 +486,18 @@
                                                         </Border>
                                                     </DockPanel>
 
-                                                    <TextBlock Grid.Row="1"
-                                                               Margin="0,10,0,10"
-                                                               Foreground="#A5B4FC"
-                                                               TextWrapping="Wrap"
-                                                               Text="{Binding Description}" />
+                                                    <Border Grid.Row="1"
+                                                            Height="40"
+                                                            Margin="0,10,0,10"
+                                                            Background="#0F172A"
+                                                            BorderBrush="#24324B"
+                                                            BorderThickness="1"
+                                                            CornerRadius="10"
+                                                            ClipToBounds="True"
+                                                            Visibility="{Binding HasAssetPreview, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <Image Source="{Binding AssetPreviewImage}"
+                                                               Stretch="UniformToFill" />
+                                                    </Border>
 
                                                     <Grid Grid.Row="2">
                                                         <Grid.ColumnDefinitions>
@@ -600,7 +584,7 @@
                             <StackPanel>
                                 <CheckBox Foreground="#E2E8F0"
                                           IsChecked="{Binding SelectedNode.IsTemporarilyDisabled, UpdateSourceTrigger=PropertyChanged}"
-                                          Content="临时停用这个节点 / 分支入口" />
+                                          Content="临时停用节点 / 分支入口" />
                                 <TextBlock Margin="0,8,0,0"
                                            Foreground="#94A3B8"
                                            TextWrapping="Wrap"
@@ -932,6 +916,8 @@
                          Background="#0F172A"
                          BorderThickness="0"
                          Foreground="#E2E8F0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                         ScrollViewer.VerticalScrollBarVisibility="Hidden"
                          ItemsSource="{Binding Logs}">
                     <ListBox.ItemTemplate>
                         <DataTemplate DataType="{x:Type viewModels:LogEntryViewModel}">
@@ -950,5 +936,491 @@
                 </ListBox>
             </Grid>
         </Border>
+
+        <Grid x:Name="FullscreenCanvasOverlay"
+              Grid.RowSpan="3"
+              Margin="-16"
+              Panel.ZIndex="20"
+              Background="#08101C"
+              Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    Background="#10192A"
+                    BorderBrush="#23304B"
+                    BorderThickness="0,0,0,1"
+                    Padding="16,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <ScrollViewer HorizontalScrollBarVisibility="Hidden"
+                                  VerticalScrollBarVisibility="Hidden"
+                                  Background="Transparent">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding NewProjectCommand}" Content="新建项目" />
+                            <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding SaveProjectCommand}" Content="保存工程" />
+                            <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding ExportScriptCommand}" Content="导出脚本" />
+                            <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding LoadProjectCommand}" Content="打开工程" />
+                            <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding CaptureImageForNodeCommand}" Content="截图定位" />
+                            <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding PasteImageForNodeCommand}" Content="粘贴图片" />
+                            <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding PickPointForNodeCommand}" Content="手动定位" />
+                            <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding StartRecordingCommand}" Content="开始录制" />
+                            <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding StopRecordingCommand}" Content="停止录制" />
+                            <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding RunPreviewCommand}" Content="运行预览" />
+                            <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding RunLiveCommand}" Content="真实执行" />
+                            <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding StopExecutionCommand}" Content="停止" />
+                            <Border Margin="0,0,8,0" Padding="10,4" Background="#172033" CornerRadius="999" VerticalAlignment="Center">
+                                <TextBlock Foreground="#F8FAFC" Text="{Binding ZoomPercentText}" />
+                            </Border>
+                            <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding BeginConnectionCommand}" Content="开始连线" />
+                            <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding CancelConnectionCommand}" Content="取消连线" />
+                            <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding DeleteSelectedConnectionCommand}" Content="删除连线" />
+                            <Border Margin="0,0,8,0" Padding="10,4" Background="#172033" CornerRadius="999" VerticalAlignment="Center">
+                                <TextBlock Foreground="#93C5FD" Text="{Binding RunStateText}" />
+                            </Border>
+                            <Border Margin="0,0,8,0" Padding="10,4" Background="#172033" CornerRadius="999" VerticalAlignment="Center">
+                                <TextBlock Foreground="#F8FAFC" Text="{Binding ConnectionModeText}" />
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Margin="0,0,12,0" VerticalAlignment="Center" Foreground="#93C5FD" FontSize="14" Text="全屏画布模式" />
+                        <Button Style="{StaticResource ToolbarButtonStyle}"
+                                Margin="0"
+                                Click="ExitCanvasFullscreenButton_Click"
+                                Content="退出全屏" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1">
+                <ScrollViewer x:Name="FullscreenDesignerScrollViewer"
+                              HorizontalScrollBarVisibility="Hidden"
+                              VerticalScrollBarVisibility="Hidden"
+                              Background="#0C1423"
+                              PreviewMouseWheel="DesignerScrollViewer_PreviewMouseWheel">
+                    <Grid Width="{Binding DesignerCanvasWidth}"
+                          Height="{Binding DesignerCanvasHeight}"
+                          Background="#0C1423"
+                          ClipToBounds="False">
+                        <Grid.LayoutTransform>
+                            <ScaleTransform ScaleX="{Binding ZoomScale}"
+                                            ScaleY="{Binding ZoomScale}" />
+                        </Grid.LayoutTransform>
+                        <Canvas x:Name="FullscreenDesignerSurface"
+                                Width="{Binding DesignerCanvasWidth}"
+                                Height="{Binding DesignerCanvasHeight}"
+                                Background="#0C1423"
+                                ClipToBounds="False"
+                                MouseLeftButtonDown="DesignerCanvas_MouseLeftButtonDown"
+                                MouseLeftButtonUp="DesignerCanvas_MouseLeftButtonUp"
+                                MouseMove="DesignerCanvas_MouseMove">
+                            <ItemsControl ItemsSource="{Binding Connections}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <Canvas />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type viewModels:DesignerConnectionViewModel}">
+                                        <Canvas>
+                                            <Path Data="{Binding PathData}"
+                                                  Stroke="{Binding StrokeBrush}"
+                                                  StrokeThickness="{Binding StrokeThickness}"
+                                                  Opacity="0.95" />
+                                            <Path Data="{Binding PathData}"
+                                                  Stroke="Transparent"
+                                                  StrokeThickness="14"
+                                                  MouseLeftButtonDown="Connection_MouseLeftButtonDown" />
+                                            <Border Canvas.Left="{Binding LabelX}"
+                                                    Canvas.Top="{Binding LabelY}"
+                                                    Padding="8,3"
+                                                    Background="{Binding LabelBackgroundBrush}"
+                                                    BorderBrush="{Binding LabelBorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="999"
+                                                    MouseLeftButtonDown="Connection_MouseLeftButtonDown">
+                                                <TextBlock FontSize="11"
+                                                           Foreground="{Binding StrokeBrush}"
+                                                           Text="{Binding Label}" />
+                                            </Border>
+                                        </Canvas>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <ItemsControl ItemsSource="{Binding Nodes}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <Canvas />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemContainerStyle>
+                                    <Style TargetType="ContentPresenter">
+                                        <Setter Property="Canvas.Left" Value="{Binding X}" />
+                                        <Setter Property="Canvas.Top" Value="{Binding Y}" />
+                                    </Style>
+                                </ItemsControl.ItemContainerStyle>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type viewModels:FlowNodeViewModel}">
+                                        <Border Width="{Binding Width}"
+                                                Height="{Binding Height}"
+                                                Background="{Binding SurfaceBrush}"
+                                                Opacity="{Binding OpacityValue}"
+                                                BorderBrush="{Binding BorderBrush}"
+                                                BorderThickness="{Binding BorderThicknessValue}"
+                                                CornerRadius="18"
+                                                Cursor="SizeAll"
+                                                MouseLeftButtonDown="Node_MouseLeftButtonDown"
+                                                MouseLeftButtonUp="Node_MouseLeftButtonUp"
+                                                MouseMove="Node_MouseMove">
+                                            <Grid>
+                                                <Grid Margin="14,14,14,12">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
+                                                    </Grid.RowDefinitions>
+
+                                                    <DockPanel Grid.Row="0">
+                                                        <TextBlock FontSize="15"
+                                                                   FontWeight="SemiBold"
+                                                                   Text="{Binding Title}" />
+                                                        <Border DockPanel.Dock="Right"
+                                                                Padding="8,3"
+                                                                Background="#0F172A"
+                                                                CornerRadius="999">
+                                                            <TextBlock Foreground="{Binding AccentBrush}"
+                                                                       FontSize="11"
+                                                                       Text="{Binding StatusLabel}" />
+                                                        </Border>
+                                                    </DockPanel>
+
+                                                    <Border Grid.Row="1"
+                                                            Height="40"
+                                                            Margin="0,10,0,10"
+                                                            Background="#0F172A"
+                                                            BorderBrush="#24324B"
+                                                            BorderThickness="1"
+                                                            CornerRadius="10"
+                                                            ClipToBounds="True"
+                                                            Visibility="{Binding HasAssetPreview, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <Image Source="{Binding AssetPreviewImage}"
+                                                               Stretch="UniformToFill" />
+                                                    </Border>
+
+                                                    <Grid Grid.Row="2">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <Ellipse Width="12" Height="12" Fill="#0F172A" Stroke="{Binding AccentBrush}" StrokeThickness="2" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Margin="10,0"
+                                                                   VerticalAlignment="Center"
+                                                                   Foreground="#94A3B8"
+                                                                   FontSize="11"
+                                                                   Text="{Binding DisplayKind}" />
+                                                        <Ellipse Grid.Column="2"
+                                                                 Width="12"
+                                                                 Height="12"
+                                                                 Fill="{Binding AccentBrush}"
+                                                                 Stroke="#E2E8F0"
+                                                                 StrokeThickness="1.2"
+                                                                 VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Grid>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Canvas>
+
+                        <primitives:Thumb Style="{StaticResource CanvasResizeThumbStyle}"
+                                          Width="12"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Stretch"
+                                          Cursor="SizeWE"
+                                          DragDelta="CanvasRightResizeThumb_DragDelta" />
+
+                        <primitives:Thumb Style="{StaticResource CanvasResizeThumbStyle}"
+                                          Height="12"
+                                          HorizontalAlignment="Stretch"
+                                          VerticalAlignment="Bottom"
+                                          Cursor="SizeNS"
+                                          DragDelta="CanvasBottomResizeThumb_DragDelta" />
+
+                        <primitives:Thumb Style="{StaticResource CanvasResizeThumbStyle}"
+                                          Width="18"
+                                          Height="18"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Bottom"
+                                          Cursor="SizeNWSE"
+                                          DragDelta="CanvasCornerResizeThumb_DragDelta" />
+                    </Grid>
+                </ScrollViewer>
+
+                <Border x:Name="FullscreenNodeDrawer"
+                        Margin="18,0,18,18"
+                        Height="360"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Bottom"
+                        Panel.ZIndex="5"
+                        Background="#111A2C"
+                        BorderBrush="#2C3E5F"
+                        BorderThickness="1"
+                        CornerRadius="18"
+                        Padding="16"
+                        Visibility="Collapsed"
+                        RenderTransformOrigin="0.5,1">
+                    <Border.RenderTransform>
+                        <TranslateTransform Y="420" />
+                    </Border.RenderTransform>
+                    <ScrollViewer HorizontalScrollBarVisibility="Hidden"
+                                  VerticalScrollBarVisibility="Hidden">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="{Binding SelectedNode.Title}" />
+                                    <TextBlock Margin="0,6,0,0" Foreground="#93C5FD" Text="{Binding SelectedNode.DisplayKind}" />
+                                </StackPanel>
+                                <Button Grid.Column="1"
+                                        Style="{StaticResource ToolbarButtonStyle}"
+                                        Margin="8,0,0,0"
+                                        Padding="10,6"
+                                        Click="CloseFullscreenNodePanelButton_Click"
+                                        Content="收起" />
+                            </Grid>
+
+                            <UniformGrid Margin="0,16,0,0" Columns="2">
+                                <Button Style="{StaticResource ToolbarButtonStyle}"
+                                        Margin="0,0,8,0"
+                                        Command="{Binding SaveSelectedNodeAsTemplateCommand}"
+                                        Content="保存复用" />
+                                <Button Style="{StaticResource ToolbarButtonStyle}"
+                                        Margin="8,0,0,0"
+                                        Command="{Binding DeleteSelectedNodeCommand}"
+                                        Content="删除节点" />
+                            </UniformGrid>
+
+                            <Border Margin="0,16,0,0" Background="#131E31" CornerRadius="14" Padding="14">
+                                <StackPanel>
+                                    <CheckBox Foreground="#E2E8F0"
+                                              IsChecked="{Binding SelectedNode.IsTemporarilyDisabled, UpdateSourceTrigger=PropertyChanged}"
+                                              Content="临时停用这个节点 / 分支入口" />
+                                    <TextBlock Margin="0,8,0,0"
+                                               Foreground="#94A3B8"
+                                               TextWrapping="Wrap"
+                                               Text="{Binding SelectedNodeDisableHint}" />
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Margin="0,16,0,8" Foreground="#CBD5E1" Text="节点名称" />
+                            <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                     Text="{Binding SelectedNode.Title, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Margin="0,16,0,8" Foreground="#CBD5E1" Text="节点描述" />
+                            <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                     Text="{Binding SelectedNode.Description, UpdateSourceTrigger=PropertyChanged}"
+                                     TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     MinHeight="84" />
+
+                            <UniformGrid Margin="0,16,0,0" Columns="2">
+                                <StackPanel Margin="0,0,8,0">
+                                    <TextBlock Margin="0,0,0,8" Foreground="#CBD5E1" Text="超时（ms）" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.TimeoutMs, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel Margin="8,0,0,0">
+                                    <TextBlock Margin="0,0,0,8" Foreground="#CBD5E1" Text="重试次数" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.RetryLimit, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </UniformGrid>
+
+                            <TextBlock Margin="0,16,0,8" Foreground="#CBD5E1" Text="节点配置表单" />
+
+                            <Border Background="#131E31"
+                                    CornerRadius="14"
+                                    Padding="14"
+                                    Visibility="{Binding SelectedNode.IsStartNode, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="目标窗口" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.TargetWindow, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="附着方式" />
+                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                              ItemsSource="{Binding SelectedNode.AttachModeOptions}"
+                                              DisplayMemberPath="Label"
+                                              SelectedValuePath="Value"
+                                              SelectedValue="{Binding SelectedNode.AttachMode, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="#131E31"
+                                    CornerRadius="14"
+                                    Padding="14"
+                                    Visibility="{Binding SelectedNode.IsActionNode, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="动作类型" />
+                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                              ItemsSource="{Binding SelectedNode.ActionTypeOptions}"
+                                              DisplayMemberPath="Label"
+                                              SelectedValuePath="Value"
+                                              SelectedValue="{Binding SelectedNode.ActionType, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="目标位置来源" />
+                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                              ItemsSource="{Binding SelectedNode.TargetModeOptions}"
+                                              DisplayMemberPath="Label"
+                                              SelectedValuePath="Value"
+                                              SelectedValue="{Binding SelectedNode.TargetMode, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="执行前等待（毫秒）" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.BeforeActionDelayMsValue, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="执行后等待（毫秒）" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.AfterActionDelayMsValue, UpdateSourceTrigger=PropertyChanged}" />
+                                    <StackPanel Margin="0,12,0,0"
+                                                Visibility="{Binding SelectedNode.ShowActionOffsetInput, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Style="{StaticResource FieldLabelStyle}" Text="偏移量（x,y）" />
+                                        <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                                 Text="{Binding SelectedNode.ClickOffset, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Margin="0,12,0,0"
+                                                Visibility="{Binding SelectedNode.ShowActionPointInput, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Style="{StaticResource FieldLabelStyle}" Text="绝对坐标（x,y）" />
+                                        <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                                 Text="{Binding SelectedNode.PointValue, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Margin="0,12,0,0"
+                                                Visibility="{Binding SelectedNode.ShowActionTextInput, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Style="{StaticResource FieldLabelStyle}" Text="输入文字内容" />
+                                        <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                                 Text="{Binding SelectedNode.ActionTextValue, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Margin="0,12,0,0"
+                                                Visibility="{Binding SelectedNode.ShowActionHotkeyInput, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Style="{StaticResource FieldLabelStyle}" Text="快捷键" />
+                                        <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                                 Text="{Binding SelectedNode.HotkeyValue, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="#131E31"
+                                    CornerRadius="14"
+                                    Padding="14"
+                                    Visibility="{Binding SelectedNode.IsVisionNode, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="识别阈值" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.ThresholdValue, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="搜索范围" />
+                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                              ItemsSource="{Binding SelectedNode.SearchRegionOptions}"
+                                              DisplayMemberPath="Label"
+                                              SelectedValuePath="Value"
+                                              SelectedValue="{Binding SelectedNode.SearchRegion, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="#131E31"
+                                    CornerRadius="14"
+                                    Padding="14"
+                                    Visibility="{Binding SelectedNode.IsWaitNode, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="等待方式" />
+                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                              ItemsSource="{Binding SelectedNode.WaitTypeOptions}"
+                                              DisplayMemberPath="Label"
+                                              SelectedValuePath="Value"
+                                              SelectedValue="{Binding SelectedNode.WaitType, UpdateSourceTrigger=PropertyChanged}" />
+                                    <StackPanel Margin="0,12,0,0"
+                                                Visibility="{Binding SelectedNode.ShowWaitDurationInput, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Style="{StaticResource FieldLabelStyle}" Text="等待时长（毫秒）" />
+                                        <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                                 Text="{Binding SelectedNode.DurationMsValue, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="#131E31"
+                                    CornerRadius="14"
+                                    Padding="14"
+                                    Visibility="{Binding SelectedNode.IsConditionNode, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="判断方式" />
+                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                              ItemsSource="{Binding SelectedNode.ConditionTypeOptions}"
+                                              DisplayMemberPath="Label"
+                                              SelectedValuePath="Value"
+                                              SelectedValue="{Binding SelectedNode.ConditionType, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="预览默认分支" />
+                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                              ItemsSource="{Binding SelectedNode.ExpectedStateOptions}"
+                                              DisplayMemberPath="Label"
+                                              SelectedValuePath="Value"
+                                              SelectedValue="{Binding SelectedNode.ExpectedState, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="#131E31"
+                                    CornerRadius="14"
+                                    Padding="14"
+                                    Visibility="{Binding SelectedNode.IsSubFlowNode, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="片段名称" />
+                                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                             Text="{Binding SelectedNode.ClipName, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,12,0,8" Style="{StaticResource FieldLabelStyle}" Text="播放模式" />
+                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                              ItemsSource="{Binding SelectedNode.PlaybackModeOptions}"
+                                              DisplayMemberPath="Label"
+                                              SelectedValuePath="Value"
+                                              SelectedValue="{Binding SelectedNode.PlaybackMode, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="#131E31"
+                                    CornerRadius="14"
+                                    Padding="14"
+                                    Visibility="{Binding SelectedNode.IsEndNode, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="结束后动作" />
+                                    <ComboBox Style="{StaticResource FieldComboBoxStyle}"
+                                              ItemsSource="{Binding SelectedNode.OnCompleteOptions}"
+                                              DisplayMemberPath="Label"
+                                              SelectedValuePath="Value"
+                                              SelectedValue="{Binding SelectedNode.OnCompleteAction, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Margin="0,16,0,8" Foreground="#CBD5E1" Text="如何配置" />
+                            <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                                     IsReadOnly="True"
+                                     Text="{Binding SelectedNodeGuideText, Mode=OneWay}"
+                                     TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     MinHeight="120" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Grid>
     </Grid>
 </Window>
