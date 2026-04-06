@@ -930,9 +930,8 @@ public sealed class MainViewModel : ObservableObject
             }
 
             var scriptContent = ScriptExporter.GenerateBatScript(projectFileName);
-            // 使用系统默认编码（中文 Windows 为 GBK），确保批处理文件在 cmd.exe 中正确显示中文
-            var encoding = System.Text.Encoding.GetEncoding(System.Globalization.CultureInfo.CurrentCulture.TextInfo.OEMCodePage);
-            await File.WriteAllTextAsync(dialog.FileName, scriptContent, encoding);
+            // 使用 UTF-8 编码（无 BOM），配合脚本中的 chcp 65001 支持中文路径和中文内容
+            await File.WriteAllTextAsync(dialog.FileName, scriptContent, new System.Text.UTF8Encoding(false));
 
             Log("成功", $"脚本已导出到：{dialog.FileName}");
         }

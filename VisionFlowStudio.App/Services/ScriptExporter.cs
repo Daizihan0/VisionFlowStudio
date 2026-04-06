@@ -19,6 +19,7 @@ public static class ScriptExporter
         var generatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
         return $@"@echo off
+chcp 65001 >nul
 :: VisionFlow Studio 自动化脚本
 :: 生成时间: {generatedAt}
 :: 项目文件: {projectFileName}
